@@ -1,0 +1,27 @@
+# Build sonuçları
+bin/
+obj/
+out/
+
+# IDE / kullanıcıya özel dosyalar
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Gizli / ortama özel ayarlar (bkz. CLAUDE.md > Güvenlik)
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Local.json
+appsettings.*.local.json
+secrets.json
+*.env
+.env
+
+# Loglar
+*.log
+
+# macOS / Windows sistem dosyaları
+.DS_Store
+Thumbs.db
