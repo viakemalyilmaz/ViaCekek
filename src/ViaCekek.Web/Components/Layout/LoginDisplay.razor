@@ -1,0 +1,13 @@
+<AuthorizeView>
+    <Authorized>
+        <span class="navbar-text me-3">@context.User.Identity?.Name</span>
+        <form action="Account/Logout" method="post">
+            <AntiforgeryToken />
+            <input type="hidden" name="returnUrl" value="/" />
+            <button type="submit" class="btn btn-outline-light btn-sm">Çıkış Yap</button>
+        </form>
+    </Authorized>
+    <NotAuthorized>
+        <a class="btn btn-outline-light btn-sm" href="Account/Login">Giriş Yap</a>
+    </NotAuthorized>
+</AuthorizeView>

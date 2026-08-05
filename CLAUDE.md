@@ -55,6 +55,14 @@ tek taraflı yapılmaz.
   - `Data/ApplicationDbContext.cs` — EF Core DbContext, Identity +
     uygulama tabloları
   - `Data/Migrations/` — EF Core migration geçmişi
+  - `Components/Pages/` — ekranlar (örn. `Tekneler.razor`), her biri
+    `@attribute [Authorize]` + `@rendermode InteractiveServer`
+  - `Components/Layout/MainLayout.razor` — üst navigasyon çubuğu (yeni
+    modül eklendikçe nav-link buraya eklenir), `LoginDisplay.razor` —
+    giriş/çıkış durumu
+  - `wwwroot/bootstrap/` — Bootstrap CSS (proje `--empty` şablonla
+    kurulduğu için CDN değil, `dotnet new blazor` çıktısından elle
+    kopyalandı; offline/tablet güvenilirliği için CDN'e bağımlı değil)
 
 ## Ortak Kurallar (Tüm Tablolar İçin)
 
@@ -87,7 +95,8 @@ Not: Kişi ve Araç giriş/çıkış takibi tek bir ekranda (Çekek Takip)
 birleştirildi — aşağıdaki 5. madde eski "Kişi Giriş/Çıkış" ve "Araç
 Giriş/Çıkış" maddelerinin yerine geçer.
 
-1. **Tekne Tanımları** ✅ (tablo) — `Tekneler`; ekran/UI henüz yok
+1. **Tekne Tanımları** ✅ — `Tekneler` tablosu + `/tekneler` ekranı
+   (liste + ekle/düzenle) tamamlandı, kullanıcı testi bekleniyor
 2. **Kişi Tanımları** ✅ (tablo) — `Kisiler`; ekran/UI henüz yok
 3. **Araç Tanımları** ✅ (tablo) — `Araclar`; ekran/UI henüz yok
 4. **Belge Tanımları** ✅ (tablo) — `KisiBelgeleri`, `AracBelgeleri`

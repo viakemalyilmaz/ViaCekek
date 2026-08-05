@@ -1,6 +1,16 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-@Body
+<nav class="navbar navbar-expand navbar-dark bg-dark px-3">
+    <a class="navbar-brand" href="/">ViaÇekek</a>
+    <div class="navbar-nav me-auto">
+        <a class="nav-link" href="tekneler">Tekneler</a>
+    </div>
+    <LoginDisplay />
+</nav>
+
+<main class="container-fluid py-3">
+    @Body
+</main>
 
 <div id="blazor-error-ui">
     An unhandled error has occurred.
