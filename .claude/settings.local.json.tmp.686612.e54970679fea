@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(sed -E 's#https://[^:]+:\\([^@]+\\)@github.com#\\\\1#' ~/.git-credentials)",
+      "Bash(curl -s -H 'Authorization: token __CMDSUB_OUTPUT__' https://api.github.com/repos/viakemalyilmaz/ViaCekek)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('full_name:', d.get\\('full_name'\\)\\); print\\('permissions:', d.get\\('permissions'\\)\\); print\\('private:', d.get\\('private'\\)\\)\")",
+      "Bash(mkdir -p /tmp/claude-1000/-home-user-workspace-ViaCekek/79145748-1bd0-49fd-a988-bb543b8d16af/scratchpad/dbtest)",
+      "Bash(dotnet new *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
