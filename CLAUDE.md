@@ -10,8 +10,11 @@ ekranın kesintisiz ve sorunsuz çalışması projenin en kritik gereksinimidir.
 Ölçek: günde ortalama ~300 kişi giriş/çıkış işlemi (düşük-orta trafik,
 yüksek eşzamanlılık beklenmiyor).
 
-Veritabanı şeması bu projenin sahibi (kullanıcı) tarafından hazırlanacak;
-Claude şema tasarımına karışmadan, üzerine uygulama katmanını inşa edecek.
+Veritabanı şeması Entity Framework Core Code-First migration'ları ile
+Claude tarafından oluşturulur: her yeni/değişen entity için migration
+üretilir, oluşan SQL kullanıcıya gösterilir, onay sonrası gerçek
+veritabanına (`VMWSCPADB\VIAAPP1` / `ViaCekek`) uygulanır. Şema tasarımı
+tek taraflı yapılmaz.
 
 ## Teknoloji Yığını
 
@@ -24,9 +27,9 @@ Claude şema tasarımına karışmadan, üzerine uygulama katmanını inşa edec
     yazmaya gerek kalmadan doğal olarak gelir. Offline senaryo
     desteklenmeyeceği için Blazor Server'ın bağlantı-bağımlılığı bu projede
     dezavantaj oluşturmaz.
-- **Entity Framework Core** — veri erişim katmanı (Code-First değil,
-  var olan şemaya göre Database-First / scaffold yaklaşımı — şema kullanıcı
-  tarafından yönetiliyor)
+- **Entity Framework Core** — veri erişim katmanı, Code-First migration
+  yaklaşımı (`dotnet ef migrations add ...` → SQL kullanıcıya gösterilir →
+  onay sonrası `dotnet ef database update`)
 - **SQL Server** — veritabanı
 - **ASP.NET Core Identity** — kullanıcı adı/şifre ile kimlik doğrulama,
   rol bazlı yetkilendirme (örn. Güvenlik Görevlisi, Yönetici)
@@ -40,11 +43,40 @@ Claude şema tasarımına karışmadan, üzerine uygulama katmanını inşa edec
   offline/kesinti senaryosu bu aşamada tasarlanmayacak.
 - Tarayıcı: modern Chromium tabanlı tarayıcılar (Chrome/Edge) hedeflenir.
 
+## Proje Yapısı
+
+- `ViaCekek.sln` — çözüm dosyası (repo kökünde)
+- `src/ViaCekek.Web/` — Blazor Web App (Interactive Server, Individual
+  Identity auth ile scaffold edildi: `dotnet new blazor -au Individual
+  -uld --empty`)
+  - `Models/` — entity sınıfları
+  - `Models/Common/AuditableEntity.cs` — ortak audit taban sınıfı (aşağıya
+    bakınız)
+  - `Data/ApplicationDbContext.cs` — EF Core DbContext, Identity +
+    uygulama tabloları
+  - `Data/Migrations/` — EF Core migration geçmişi
+
+## Ortak Kurallar (Tüm Tablolar İçin)
+
+- **Audit alanları**: Her tablo `KayitTarihi`, `Kaydeden`,
+  `GuncellemeTarihi`, `Guncelleyen` alanlarına sahip olacak. Bu, ortak
+  `AuditableEntity` taban sınıfından türetilerek sağlanır — yeni bir
+  entity eklerken bu sınıftan türetmek yeterli, alanları tekrar tanımlamaya
+  gerek yok.
+- Bu alanlar `ApplicationDbContext.SaveChangesAsync` içinde otomatik
+  doldurulur (ekleme → `KayitTarihi`/`Kaydeden`; güncelleme →
+  `GuncellemeTarihi`/`Guncelleyen`). Kullanıcı adı, giriş yapmış kullanıcının
+  `AuthenticationStateProvider` üzerinden okunan adıdır (Blazor Server'da
+  `HttpContext` interactive circuit'te güvenilir olmadığı için bilerek
+  `IHttpContextAccessor` **kullanılmıyor**). Senkron `SaveChanges` bilerek
+  desteklenmiyor — tüm kayıt işlemleri `SaveChangesAsync` ile yapılmalı.
+
 ## Modüller (Geliştirme Sırası)
 
 Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 
-1. **Tekne Tanımları** — tekne kayıtlarının tutulduğu tablo/ekran
+1. **Tekne Tanımları** ✅ — tekne kayıtlarının tutulduğu tablo/ekran
+   (`Tekneler` tablosu ve migration'ları uygulandı; ekran/UI henüz yok)
 2. **Kişi Tanımları** — kişi kayıtlarının tutulduğu tablo/ekran
 3. **Araç Tanımları** — araç kayıtlarının tutulduğu tablo/ekran
 4. **Belge Tanımları** — kontrol edilecek belge türlerinin parametrik
@@ -57,9 +89,10 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 
 ## Veri Modeli (Kavramsal Taslak)
 
-> Not: Nihai şema kullanıcı tarafından hazırlanacaktır. Aşağıdaki taslak,
-> gereksinimlerden çıkarılan alanları ve ilişkileri modüller arasında ortak
-> bir dil kurmak amacıyla listeler; bağlayıcı değildir.
+> Not: Aşağıdaki alan listelerine tüm tablolarda ortak olan audit alanları
+> (`KayitTarihi`, `Kaydeden`, `GuncellemeTarihi`, `Guncelleyen` — bkz.
+> "Ortak Kurallar") ayrıca yazılmamıştır, `AuditableEntity`'den otomatik
+> gelir.
 
 ### Tekne (Boat)
 - Tekne Kodu

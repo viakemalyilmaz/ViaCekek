@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using ViaCekek.Web.Models.Common;
 
 namespace ViaCekek.Web.Models;
 
-public class Tekne
+public class Tekne : AuditableEntity
 {
     public int Id { get; set; }
 

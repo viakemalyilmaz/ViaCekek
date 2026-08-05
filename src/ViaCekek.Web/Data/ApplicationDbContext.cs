@@ -1,10 +1,14 @@
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ViaCekek.Web.Models;
+using ViaCekek.Web.Models.Common;
 
 namespace ViaCekek.Web.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+public class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    AuthenticationStateProvider authenticationStateProvider) : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<Tekne> Tekneler => Set<Tekne>();
 
@@ -15,5 +19,44 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<Tekne>()
             .HasIndex(t => t.TekneKodu)
             .IsUnique();
+    }
+
+    // Blazor Server interactive circuit'lerde HttpContext güvenilir olmadığından
+    // (SignalR bağlantısı kurulduktan sonra ilk isteğe ait HttpContext elden çıkar),
+    // audit alanları yalnızca asenkron yolda, AuthenticationStateProvider üzerinden
+    // doldurulur. Senkron SaveChanges bilerek desteklenmiyor.
+    public override int SaveChanges()
+        => throw new InvalidOperationException(
+            "SaveChanges yerine SaveChangesAsync kullanın: audit alanları (Kaydeden/Güncelleyen) " +
+            "yalnızca asenkron AuthenticationStateProvider çağrısıyla güvenilir şekilde doldurulabilir.");
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await UygulaAuditBilgisiAsync();
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task UygulaAuditBilgisiAsync()
+    {
+        if (!ChangeTracker.Entries<AuditableEntity>().Any(e => e.State is EntityState.Added or EntityState.Modified))
+            return;
+
+        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+        var kullanici = authState.User?.Identity?.Name ?? "system";
+        var simdi = DateTime.Now;
+
+        foreach (var entry in ChangeTracker.Entries<AuditableEntity>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.KayitTarihi = simdi;
+                entry.Entity.Kaydeden = kullanici;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.GuncellemeTarihi = simdi;
+                entry.Entity.Guncelleyen = kullanici;
+            }
+        }
     }
 }
