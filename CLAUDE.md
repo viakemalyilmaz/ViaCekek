@@ -77,7 +77,9 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 
 1. **Tekne Tanımları** ✅ — tekne kayıtlarının tutulduğu tablo/ekran
    (`Tekneler` tablosu ve migration'ları uygulandı; ekran/UI henüz yok)
-2. **Kişi Tanımları** — kişi kayıtlarının tutulduğu tablo/ekran
+2. **Kişi Tanımları** ✅ (kısmi) — `Kisiler` tablosu ve migration'ları
+   uygulandı; ekran/UI henüz yok. Kişi–Tekne ilişkisi (bkz. Açık Konular)
+   ayrı bir migration olarak bekliyor.
 3. **Araç Tanımları** — araç kayıtlarının tutulduğu tablo/ekran
 4. **Belge Tanımları** — kontrol edilecek belge türlerinin parametrik
    tanımı ve hangi durumlarda sorgulanacaklarının kuralları
@@ -99,15 +101,25 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 - Tekne Adı
 - Aktif / Pasif
 
-### Kişi (Person)
-- Kimlik Numarası (TC Kimlik No / Pasaport vb.)
-- Ad Soyad
-- Telefon
-- Firma bilgisi (kişi bir firma personeliyse)
-- Ziyaretçi Tipi (örn. Kaptan, Tekne Sahibi, Tekne Personeli, Diğer — bkz.
-  "Ziyaretçi Tipleri" açık konusu)
-- İlişkili Tekne(ler) — ziyaretçi tipi nitelikli (Kaptan/Tekne
-  Sahibi/Tekne Personeli) ise hangi tekne(ler) ile ilişkili olduğu
+### Kişi (Person) — uygulandı (`Kisiler` tablosu)
+- Kimlik Numarası — `nvarchar(20)`, **unique** (TC Kimlik No / Pasaport,
+  sabit uzunluk/format zorunlu değil)
+- Ad Soyad — tek alan (Ad/Soyad ayrı tutulmuyor, hız önceliği)
+- Firma Adı — serbest metin, ayrı bir Firma tablosu **yok** (hız
+  önceliği); UI'da önceden girilmiş `FirmaAdi` değerlerinden autocomplete
+  önerilecek (indexlendi)
+- Telefon — yalnızca rakam, boşluksuz, 7-15 hane (TR formatına
+  kısıtlanmadı, yurt dışı numaraları da girilebilir)
+- Aktif / Pasif
+- Yasaklanma Sebebi — nullable; yalnızca Pasif iken doldurulabilir
+  (veritabanı seviyesinde CHECK constraint ile garanti altına alındı).
+  Kişi Takip Ekranı (modül 5) yapılırken: bu alan doluysa sorgulama
+  anında görünür bir uyarı gösterilecek.
+- Ziyaretçi niteliği: `TekneSahibi`, `Kaptan`, `TeknePersoneli` —
+  birbirini dışlamayan bağımsız checkbox'lar (bir kişi aynı anda birden
+  fazlası olabilir)
+- **Henüz yok**: bu niteliklerin hangi tekne(ler)e bağlı olduğu — bkz.
+  Açık Konular
 
 ### Araç (Vehicle)
 - Kişi kaydına benzer temel bilgiler (plaka, marka/model vb. — netleşecek)
@@ -159,8 +171,6 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 
 Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konular:
 
-- **Ziyaretçi Tipleri**: Kaptan, Tekne Sahibi, Tekne Personeli dışında
-  başka tipler olacak mı (örn. Misafir, Tedarikçi, Firma Personeli)?
 - **Ziyaret Tipleri**: "Çalışma" dışında hangi ziyaret tipleri olacak,
   tam liste nedir?
 - **KVKK onayı nasıl alınacak**: Tablette imza/onay ekranı mı, yoksa
@@ -176,9 +186,11 @@ Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konula
   erişebilir) netleşmeli.
 - **Raporlama ihtiyaçları**: Sahada kimler var, geçmiş giriş/çıkış
   raporları gibi ihtiyaçlar var mı, varsa kapsamı nedir?
-- **Tekne–Kişi ilişkisi çokluğu**: Bir kişi birden fazla tekneyle
-  ilişkilendirilebilir mi (örn. bir kaptan birden fazla teknede
-  çalışıyorsa)?
+- **Tekne–Kişi ilişkisi**: `TekneSahibi`/`Kaptan`/`TeknePersoneli`
+  işaretli bir kişinin hangi tekne(ler)e bağlı olduğu henüz
+  modellenmedi (2026-08-05 itibarıyla bilerek ertelendi). Karara
+  bağlanması gereken: bir kişi birden fazla tekneyle ilişkilendirilebilir
+  mi (örn. bir kaptan birden fazla teknede çalışıyorsa)?
 
 ## Güvenlik / Gizli Bilgi Yönetimi
 

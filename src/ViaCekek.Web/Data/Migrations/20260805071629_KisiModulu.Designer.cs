@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ViaCekek.Web.Data;
 
 #nullable disable
 
-namespace ViaCekek.Web.Migrations
+namespace ViaCekek.Web.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805071629_KisiModulu")]
+    partial class KisiModulu
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -247,9 +250,6 @@ namespace ViaCekek.Web.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<bool>("Kaptan")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Kaydeden")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -262,12 +262,6 @@ namespace ViaCekek.Web.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("TeknePersoneli")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("TekneSahibi")
-                        .HasColumnType("bit");
 
                     b.Property<string>("Telefon")
                         .HasMaxLength(15)

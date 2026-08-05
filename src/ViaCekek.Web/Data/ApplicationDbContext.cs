@@ -11,6 +11,7 @@ public class ApplicationDbContext(
     AuthenticationStateProvider authenticationStateProvider) : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<Tekne> Tekneler => Set<Tekne>();
+    public DbSet<Kisi> Kisiler => Set<Kisi>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -19,6 +20,19 @@ public class ApplicationDbContext(
         builder.Entity<Tekne>()
             .HasIndex(t => t.TekneKodu)
             .IsUnique();
+
+        builder.Entity<Kisi>()
+            .HasIndex(k => k.KimlikNumarasi)
+            .IsUnique();
+
+        // FirmaAdi'nda autocomplete sorgusu (DISTINCT + arama) hızlı çalışsın diye.
+        builder.Entity<Kisi>()
+            .HasIndex(k => k.FirmaAdi);
+
+        // Yasaklanma Sebebi yalnızca Pasif kişilerde girilebilir.
+        builder.Entity<Kisi>().ToTable(t => t.HasCheckConstraint(
+            "CK_Kisiler_YasaklanmaSebebi_Aktif",
+            "[Aktif] = 1 AND [YasaklanmaSebebi] IS NULL OR [Aktif] = 0"));
     }
 
     // Blazor Server interactive circuit'lerde HttpContext güvenilir olmadığından
