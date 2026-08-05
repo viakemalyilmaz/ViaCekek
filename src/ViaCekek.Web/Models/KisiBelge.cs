@@ -27,4 +27,5 @@ public class KisiBelge : AuditableEntity
     public bool GecerliKontrol { get; set; }
     public bool GecerliMalzemeAlma { get; set; }
     public bool GecerliMalzemeBirakma { get; set; }
+    public bool GecerliIskeleKurma { get; set; }
 }

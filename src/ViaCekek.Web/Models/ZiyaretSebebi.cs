@@ -7,5 +7,6 @@ public enum ZiyaretSebebi
     Kesif,
     Kontrol,
     MalzemeAlma,
-    MalzemeBirakma
+    MalzemeBirakma,
+    IskeleKurma
 }

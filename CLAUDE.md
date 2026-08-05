@@ -180,8 +180,8 @@ ayrı tablolarda (altta).
   - `AracBelgeleri`: `GecerliArac`, `GecerliVinc`, `GecerliVidanjor`,
     `GecerliKompresor`, `GecerliBasincliKap` (bkz. Araç Türü enum'u)
   - `KisiBelgeleri`: `GecerliCalisma`, `GecerliGorusme`, `GecerliKesif`,
-    `GecerliKontrol`, `GecerliMalzemeAlma`, `GecerliMalzemeBirakma`
-    (bkz. Ziyaret Sebebi enum'u)
+    `GecerliKontrol`, `GecerliMalzemeAlma`, `GecerliMalzemeBirakma`,
+    `GecerliIskeleKurma` (bkz. Ziyaret Sebebi enum'u)
 
 ### Belge Kontrol Logları — `KisiBelgeKontrolleri` / `AracBelgeKontrolleri` (uygulandı)
 
@@ -208,7 +208,7 @@ Hem kişi hem araç giriş/çıkışları **tek tabloda** tutulur.
 - `GirisTarihi`/`GirisSaati`, `CikisTarihi`/`CikisSaati` — tarih ve saat
   ayrı kolonlar (`date`/`time`)
 - `ZiyaretSebebi` — sabit enum: Çalışma, Görüşme, Keşif, Kontrol,
-  Malzeme Alma, Malzeme Bırakma
+  Malzeme Alma, Malzeme Bırakma, İskele Kurma
 - `Aciklama` — serbest metin
 
 ## İş Kuralları
@@ -263,7 +263,7 @@ Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konula
 
 Çözülenler (referans için): Ziyaret Tipleri → `ZiyaretSebebi` sabit
 enum'u ile netleşti (Çalışma/Görüşme/Keşif/Kontrol/Malzeme Alma/Malzeme
-Bırakma). Belge kontrol kuralları → `KisiBelgeleri`/`AracBelgeleri`
+Bırakma/İskele Kurma). Belge kontrol kuralları → `KisiBelgeleri`/`AracBelgeleri`
 üzerindeki checkbox'larla parametrize edildi. Tekne–Kişi ilişkisi →
 kalıcı bir alan yerine her girişte `CekekTakip.TekneId` ile çözüldü.
 Kullanıcı rolleri → 3 sabit rol ile netleşti (bkz. Kullanıcı Yönetimi).

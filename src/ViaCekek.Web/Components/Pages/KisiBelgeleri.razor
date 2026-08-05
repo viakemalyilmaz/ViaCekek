@@ -76,6 +76,10 @@
                 <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliMalzemeBirakma" id="malzemeBirakmaCheck" />
                 <label class="form-check-label" for="malzemeBirakmaCheck">Malzeme Bırakma</label>
             </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliIskeleKurma" id="iskeleKurmaCheck" />
+                <label class="form-check-label" for="iskeleKurmaCheck">İskele Kurma</label>
+            </div>
         </fieldset>
 
         <div>
@@ -169,6 +173,7 @@ else
         if (belge.GecerliKontrol) yield return "Kontrol";
         if (belge.GecerliMalzemeAlma) yield return "Malzeme Alma";
         if (belge.GecerliMalzemeBirakma) yield return "Malzeme Bırakma";
+        if (belge.GecerliIskeleKurma) yield return "İskele Kurma";
     }
 
     private void YeniBelgeBaslat()
@@ -192,7 +197,8 @@ else
             GecerliKesif = belge.GecerliKesif,
             GecerliKontrol = belge.GecerliKontrol,
             GecerliMalzemeAlma = belge.GecerliMalzemeAlma,
-            GecerliMalzemeBirakma = belge.GecerliMalzemeBirakma
+            GecerliMalzemeBirakma = belge.GecerliMalzemeBirakma,
+            GecerliIskeleKurma = belge.GecerliIskeleKurma
         };
         hataMesaji = null;
         formAcik = true;
@@ -232,6 +238,7 @@ else
                 mevcut.GecerliKontrol = duzenlenenBelge.GecerliKontrol;
                 mevcut.GecerliMalzemeAlma = duzenlenenBelge.GecerliMalzemeAlma;
                 mevcut.GecerliMalzemeBirakma = duzenlenenBelge.GecerliMalzemeBirakma;
+                mevcut.GecerliIskeleKurma = duzenlenenBelge.GecerliIskeleKurma;
             }
 
             await Db.SaveChangesAsync();
