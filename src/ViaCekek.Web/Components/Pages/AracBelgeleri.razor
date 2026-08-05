@@ -1,0 +1,239 @@
+@page "/aracbelgeleri"
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using ViaCekek.Web.Data
+@using ViaCekek.Web.Models
+@inject ApplicationDbContext Db
+
+<PageTitle>Araç Belgeleri</PageTitle>
+
+<h3>Araç Belgeleri</h3>
+<p class="text-muted">
+    Hangi belgenin, hangi araç türünde, nasıl kontrol edileceğini tanımlar
+    (kural listesi) — spesifik araca özel kayıt tutmaz.
+</p>
+
+@if (hataMesaji is not null)
+{
+    <div class="alert alert-danger">@hataMesaji</div>
+}
+
+<button class="btn btn-primary mb-3" @onclick="YeniBelgeBaslat">+ Yeni Belge</button>
+
+@if (formAcik)
+{
+    <EditForm Model="duzenlenenBelge" OnValidSubmit="Kaydet" class="card card-body mb-3">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">Belge Tanımı</label>
+            <InputText class="form-control" @bind-Value="duzenlenenBelge.BelgeTanimi" />
+        </div>
+
+        <fieldset class="mb-3">
+            <legend class="form-label fs-6">Kontrol Kuralı</legend>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.Alindi" id="alindiCheck" />
+                <label class="form-check-label" for="alindiCheck">Alındı kontrolü yapılsın</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerlilikTarihiKontrolu" id="gecerlilikCheck" />
+                <label class="form-check-label" for="gecerlilikCheck">Ayrıca geçerlilik tarihi kontrolü yapılsın</label>
+            </div>
+        </fieldset>
+
+        <div class="form-check mb-3">
+            <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.Aktif" id="aktifCheck" />
+            <label class="form-check-label" for="aktifCheck">Aktif</label>
+        </div>
+
+        <fieldset class="mb-3">
+            <legend class="form-label fs-6">Hangi Araç Türünde Kontrol Edilir</legend>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliArac" id="aracCheck" />
+                <label class="form-check-label" for="aracCheck">Araç</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliVinc" id="vincCheck" />
+                <label class="form-check-label" for="vincCheck">Vinç</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliVidanjor" id="vidanjorCheck" />
+                <label class="form-check-label" for="vidanjorCheck">Vidanjör</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliKompresor" id="kompresorCheck" />
+                <label class="form-check-label" for="kompresorCheck">Kompresör</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliBasincliKap" id="basincliKapCheck" />
+                <label class="form-check-label" for="basincliKapCheck">Basınçlı Kap</label>
+            </div>
+        </fieldset>
+
+        <div>
+            <button type="submit" class="btn btn-success">Kaydet</button>
+            <button type="button" class="btn btn-secondary" @onclick="FormuKapat">İptal</button>
+        </div>
+    </EditForm>
+}
+
+@if (belgeler is null)
+{
+    <p>Yükleniyor...</p>
+}
+else if (belgeler.Count == 0)
+{
+    <p>Henüz belge tanımı yok.</p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Belge Tanımı</th>
+                <th>Kontrol Kuralı</th>
+                <th>Araç Türleri</th>
+                <th>Durum</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var belge in belgeler)
+            {
+                <tr>
+                    <td>@belge.BelgeTanimi</td>
+                    <td>
+                        @if (belge.Alindi)
+                        {
+                            <span class="badge bg-info text-dark me-1">Alındı</span>
+                        }
+                        @if (belge.GecerlilikTarihiKontrolu)
+                        {
+                            <span class="badge bg-info text-dark me-1">Geçerlilik Tarihi</span>
+                        }
+                    </td>
+                    <td>
+                        @foreach (var tur in AracTurleri(belge))
+                        {
+                            <span class="badge bg-secondary me-1">@tur</span>
+                        }
+                    </td>
+                    <td>
+                        @if (belge.Aktif)
+                        {
+                            <span class="badge bg-success">Aktif</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Pasif</span>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => DuzenlemeBaslat(belge)">Düzenle</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<AracBelge>? belgeler;
+    private AracBelge duzenlenenBelge = new();
+    private bool formAcik;
+    private string? hataMesaji;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ListeyiYenile();
+    }
+
+    private async Task ListeyiYenile()
+    {
+        belgeler = await Db.AracBelgeleri.OrderBy(b => b.BelgeTanimi).ToListAsync();
+    }
+
+    private static IEnumerable<string> AracTurleri(AracBelge belge)
+    {
+        if (belge.GecerliArac) yield return "Araç";
+        if (belge.GecerliVinc) yield return "Vinç";
+        if (belge.GecerliVidanjor) yield return "Vidanjör";
+        if (belge.GecerliKompresor) yield return "Kompresör";
+        if (belge.GecerliBasincliKap) yield return "Basınçlı Kap";
+    }
+
+    private void YeniBelgeBaslat()
+    {
+        duzenlenenBelge = new AracBelge { Aktif = true };
+        hataMesaji = null;
+        formAcik = true;
+    }
+
+    private void DuzenlemeBaslat(AracBelge belge)
+    {
+        duzenlenenBelge = new AracBelge
+        {
+            Id = belge.Id,
+            BelgeTanimi = belge.BelgeTanimi,
+            Alindi = belge.Alindi,
+            GecerlilikTarihiKontrolu = belge.GecerlilikTarihiKontrolu,
+            Aktif = belge.Aktif,
+            GecerliArac = belge.GecerliArac,
+            GecerliVinc = belge.GecerliVinc,
+            GecerliVidanjor = belge.GecerliVidanjor,
+            GecerliKompresor = belge.GecerliKompresor,
+            GecerliBasincliKap = belge.GecerliBasincliKap
+        };
+        hataMesaji = null;
+        formAcik = true;
+    }
+
+    private void FormuKapat()
+    {
+        formAcik = false;
+        hataMesaji = null;
+    }
+
+    private async Task Kaydet()
+    {
+        hataMesaji = null;
+        try
+        {
+            if (duzenlenenBelge.Id == 0)
+            {
+                Db.AracBelgeleri.Add(duzenlenenBelge);
+            }
+            else
+            {
+                var mevcut = await Db.AracBelgeleri.FindAsync(duzenlenenBelge.Id);
+                if (mevcut is null)
+                {
+                    hataMesaji = "Kayıt bulunamadı, sayfayı yenileyin.";
+                    return;
+                }
+
+                mevcut.BelgeTanimi = duzenlenenBelge.BelgeTanimi;
+                mevcut.Alindi = duzenlenenBelge.Alindi;
+                mevcut.GecerlilikTarihiKontrolu = duzenlenenBelge.GecerlilikTarihiKontrolu;
+                mevcut.Aktif = duzenlenenBelge.Aktif;
+                mevcut.GecerliArac = duzenlenenBelge.GecerliArac;
+                mevcut.GecerliVinc = duzenlenenBelge.GecerliVinc;
+                mevcut.GecerliVidanjor = duzenlenenBelge.GecerliVidanjor;
+                mevcut.GecerliKompresor = duzenlenenBelge.GecerliKompresor;
+                mevcut.GecerliBasincliKap = duzenlenenBelge.GecerliBasincliKap;
+            }
+
+            await Db.SaveChangesAsync();
+            formAcik = false;
+            await ListeyiYenile();
+        }
+        catch (DbUpdateException)
+        {
+            hataMesaji = "Kayıt sırasında bir hata oluştu.";
+        }
+    }
+}

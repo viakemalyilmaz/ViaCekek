@@ -108,8 +108,9 @@ Belgeleri yapıldı — Araç ve Araç Belgeleri ekranları sonraki adımlar.
 4. **Araç Tanımları** ✅ — `Araclar` tablosu + `/araclar` ekranı (liste +
    ekle/düzenle, Araç Türü seçimi, Firma Adı autocomplete, koşullu
    Yasaklanma Sebebi) tamamlandı, kullanıcı testi bekleniyor
-5. **Araç Belgeleri** — `AracBelgeleri` tablosu hazır, ekran henüz yok
-   (ertelendi)
+5. **Araç Belgeleri** ✅ — `AracBelgeleri` tablosu + `/aracbelgeleri`
+   ekranı (kural tanımı: belge adı, kontrol kuralı, araç türü
+   uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
 6. **Çekek Takip Ekranı** ✅ (tablo) — `CekekTakipleri` (hem kişi hem
    araç giriş/çıkışı tek tabloda); tablette sürekli açık kalan ana
    operasyon ekranı; ekran/UI henüz yok
