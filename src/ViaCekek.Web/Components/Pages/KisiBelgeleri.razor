@@ -1,0 +1,246 @@
+@page "/kisibelgeleri"
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using ViaCekek.Web.Data
+@using ViaCekek.Web.Models
+@inject ApplicationDbContext Db
+
+<PageTitle>Kişi Belgeleri</PageTitle>
+
+<h3>Kişi Belgeleri</h3>
+<p class="text-muted">
+    Hangi belgenin, hangi ziyaret sebebinde, nasıl kontrol edileceğini
+    tanımlar (kural listesi) — kişiye özel kayıt tutmaz.
+</p>
+
+@if (hataMesaji is not null)
+{
+    <div class="alert alert-danger">@hataMesaji</div>
+}
+
+<button class="btn btn-primary mb-3" @onclick="YeniBelgeBaslat">+ Yeni Belge</button>
+
+@if (formAcik)
+{
+    <EditForm Model="duzenlenenBelge" OnValidSubmit="Kaydet" class="card card-body mb-3">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">Belge Tanımı</label>
+            <InputText class="form-control" @bind-Value="duzenlenenBelge.BelgeTanimi" />
+        </div>
+
+        <fieldset class="mb-3">
+            <legend class="form-label fs-6">Kontrol Kuralı</legend>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.Alindi" id="alindiCheck" />
+                <label class="form-check-label" for="alindiCheck">Alındı kontrolü yapılsın</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerlilikTarihiKontrolu" id="gecerlilikCheck" />
+                <label class="form-check-label" for="gecerlilikCheck">Ayrıca geçerlilik tarihi kontrolü yapılsın</label>
+            </div>
+        </fieldset>
+
+        <div class="form-check mb-3">
+            <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.Aktif" id="aktifCheck" />
+            <label class="form-check-label" for="aktifCheck">Aktif</label>
+        </div>
+
+        <fieldset class="mb-3">
+            <legend class="form-label fs-6">Hangi Ziyaret Sebebinde Kontrol Edilir</legend>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliCalisma" id="calismaCheck" />
+                <label class="form-check-label" for="calismaCheck">Çalışma</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliGorusme" id="gorusmeCheck" />
+                <label class="form-check-label" for="gorusmeCheck">Görüşme</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliKesif" id="kesifCheck" />
+                <label class="form-check-label" for="kesifCheck">Keşif</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliKontrol" id="kontrolCheck" />
+                <label class="form-check-label" for="kontrolCheck">Kontrol</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliMalzemeAlma" id="malzemeAlmaCheck" />
+                <label class="form-check-label" for="malzemeAlmaCheck">Malzeme Alma</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenBelge.GecerliMalzemeBirakma" id="malzemeBirakmaCheck" />
+                <label class="form-check-label" for="malzemeBirakmaCheck">Malzeme Bırakma</label>
+            </div>
+        </fieldset>
+
+        <div>
+            <button type="submit" class="btn btn-success">Kaydet</button>
+            <button type="button" class="btn btn-secondary" @onclick="FormuKapat">İptal</button>
+        </div>
+    </EditForm>
+}
+
+@if (belgeler is null)
+{
+    <p>Yükleniyor...</p>
+}
+else if (belgeler.Count == 0)
+{
+    <p>Henüz belge tanımı yok.</p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Belge Tanımı</th>
+                <th>Kontrol Kuralı</th>
+                <th>Ziyaret Sebepleri</th>
+                <th>Durum</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var belge in belgeler)
+            {
+                <tr>
+                    <td>@belge.BelgeTanimi</td>
+                    <td>
+                        @if (belge.Alindi)
+                        {
+                            <span class="badge bg-info text-dark me-1">Alındı</span>
+                        }
+                        @if (belge.GecerlilikTarihiKontrolu)
+                        {
+                            <span class="badge bg-info text-dark me-1">Geçerlilik Tarihi</span>
+                        }
+                    </td>
+                    <td>
+                        @foreach (var sebep in ZiyaretSebepleri(belge))
+                        {
+                            <span class="badge bg-secondary me-1">@sebep</span>
+                        }
+                    </td>
+                    <td>
+                        @if (belge.Aktif)
+                        {
+                            <span class="badge bg-success">Aktif</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Pasif</span>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => DuzenlemeBaslat(belge)">Düzenle</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<KisiBelge>? belgeler;
+    private KisiBelge duzenlenenBelge = new();
+    private bool formAcik;
+    private string? hataMesaji;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ListeyiYenile();
+    }
+
+    private async Task ListeyiYenile()
+    {
+        belgeler = await Db.KisiBelgeleri.OrderBy(b => b.BelgeTanimi).ToListAsync();
+    }
+
+    private static IEnumerable<string> ZiyaretSebepleri(KisiBelge belge)
+    {
+        if (belge.GecerliCalisma) yield return "Çalışma";
+        if (belge.GecerliGorusme) yield return "Görüşme";
+        if (belge.GecerliKesif) yield return "Keşif";
+        if (belge.GecerliKontrol) yield return "Kontrol";
+        if (belge.GecerliMalzemeAlma) yield return "Malzeme Alma";
+        if (belge.GecerliMalzemeBirakma) yield return "Malzeme Bırakma";
+    }
+
+    private void YeniBelgeBaslat()
+    {
+        duzenlenenBelge = new KisiBelge { Aktif = true };
+        hataMesaji = null;
+        formAcik = true;
+    }
+
+    private void DuzenlemeBaslat(KisiBelge belge)
+    {
+        duzenlenenBelge = new KisiBelge
+        {
+            Id = belge.Id,
+            BelgeTanimi = belge.BelgeTanimi,
+            Alindi = belge.Alindi,
+            GecerlilikTarihiKontrolu = belge.GecerlilikTarihiKontrolu,
+            Aktif = belge.Aktif,
+            GecerliCalisma = belge.GecerliCalisma,
+            GecerliGorusme = belge.GecerliGorusme,
+            GecerliKesif = belge.GecerliKesif,
+            GecerliKontrol = belge.GecerliKontrol,
+            GecerliMalzemeAlma = belge.GecerliMalzemeAlma,
+            GecerliMalzemeBirakma = belge.GecerliMalzemeBirakma
+        };
+        hataMesaji = null;
+        formAcik = true;
+    }
+
+    private void FormuKapat()
+    {
+        formAcik = false;
+        hataMesaji = null;
+    }
+
+    private async Task Kaydet()
+    {
+        hataMesaji = null;
+        try
+        {
+            if (duzenlenenBelge.Id == 0)
+            {
+                Db.KisiBelgeleri.Add(duzenlenenBelge);
+            }
+            else
+            {
+                var mevcut = await Db.KisiBelgeleri.FindAsync(duzenlenenBelge.Id);
+                if (mevcut is null)
+                {
+                    hataMesaji = "Kayıt bulunamadı, sayfayı yenileyin.";
+                    return;
+                }
+
+                mevcut.BelgeTanimi = duzenlenenBelge.BelgeTanimi;
+                mevcut.Alindi = duzenlenenBelge.Alindi;
+                mevcut.GecerlilikTarihiKontrolu = duzenlenenBelge.GecerlilikTarihiKontrolu;
+                mevcut.Aktif = duzenlenenBelge.Aktif;
+                mevcut.GecerliCalisma = duzenlenenBelge.GecerliCalisma;
+                mevcut.GecerliGorusme = duzenlenenBelge.GecerliGorusme;
+                mevcut.GecerliKesif = duzenlenenBelge.GecerliKesif;
+                mevcut.GecerliKontrol = duzenlenenBelge.GecerliKontrol;
+                mevcut.GecerliMalzemeAlma = duzenlenenBelge.GecerliMalzemeAlma;
+                mevcut.GecerliMalzemeBirakma = duzenlenenBelge.GecerliMalzemeBirakma;
+            }
+
+            await Db.SaveChangesAsync();
+            formAcik = false;
+            await ListeyiYenile();
+        }
+        catch (DbUpdateException)
+        {
+            hataMesaji = "Kayıt sırasında bir hata oluştu.";
+        }
+    }
+}

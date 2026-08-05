@@ -93,20 +93,26 @@ tek taraflı yapılmaz.
 
 Not: Kişi ve Araç giriş/çıkış takibi tek bir ekranda (Çekek Takip)
 birleştirildi — aşağıdaki 5. madde eski "Kişi Giriş/Çıkış" ve "Araç
-Giriş/Çıkış" maddelerinin yerine geçer.
+Giriş/Çıkış" maddelerinin yerine geçer. Ekran sırası 2026-08-05'te
+kullanıcı tercihiyle değişti: Araç Tanımları ertelendi, önce Kişi
+Belgeleri yapıldı — Araç ve Araç Belgeleri ekranları sonraki adımlar.
 
 1. **Tekne Tanımları** ✅ — `Tekneler` tablosu + `/tekneler` ekranı
    (liste + ekle/düzenle) tamamlandı, kullanıcı testi bekleniyor
 2. **Kişi Tanımları** ✅ — `Kisiler` tablosu + `/kisiler` ekranı (liste +
    ekle/düzenle, Firma Adı autocomplete, koşullu Yasaklanma Sebebi
    alanı) tamamlandı, kullanıcı testi bekleniyor
-3. **Araç Tanımları** ✅ (tablo) — `Araclar`; ekran/UI henüz yok
-4. **Belge Tanımları** ✅ (tablo) — `KisiBelgeleri`, `AracBelgeleri`
-   (kural/kontrol listesi tabloları); ekran/UI henüz yok
-5. **Çekek Takip Ekranı** ✅ (tablo) — `CekekTakipleri` (hem kişi hem
+3. **Kişi Belgeleri** ✅ — `KisiBelgeleri` tablosu + `/kisibelgeleri`
+   ekranı (kural tanımı: belge adı, kontrol kuralı, ziyaret sebebi
+   uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
+4. **Araç Tanımları** — `Araclar` tablosu hazır, ekran henüz yok
+   (ertelendi)
+5. **Araç Belgeleri** — `AracBelgeleri` tablosu hazır, ekran henüz yok
+   (ertelendi)
+6. **Çekek Takip Ekranı** ✅ (tablo) — `CekekTakipleri` (hem kişi hem
    araç giriş/çıkışı tek tabloda); tablette sürekli açık kalan ana
    operasyon ekranı; ekran/UI henüz yok
-6. **Zamanlayıcı / Durum Güncelleme Motoru** — parametrik kurallara göre
+7. **Zamanlayıcı / Durum Güncelleme Motoru** — parametrik kurallara göre
    giriş/çıkış kayıtlarının durumunu otomatik güncelleyen arka plan
    servisi; henüz başlanmadı
 
