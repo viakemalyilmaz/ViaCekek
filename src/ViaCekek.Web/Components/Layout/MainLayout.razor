@@ -4,7 +4,12 @@
 <nav class="navbar navbar-expand navbar-dark bg-dark px-3">
     <a class="navbar-brand" href="/">ViaÇekek</a>
     <div class="navbar-nav me-auto">
-        <a class="nav-link" href="tekneler">Tekneler</a>
+        <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru}")">
+            <Authorized>
+                <a class="nav-link" href="tekneler">Tekneler</a>
+                <a class="nav-link" href="kisiler">Kişiler</a>
+            </Authorized>
+        </AuthorizeView>
         <AuthorizeView Roles="@Roller.Yonetici">
             <Authorized>
                 <a class="nav-link" href="kullanicilar">Kullanıcılar</a>

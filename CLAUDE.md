@@ -97,7 +97,9 @@ Giriş/Çıkış" maddelerinin yerine geçer.
 
 1. **Tekne Tanımları** ✅ — `Tekneler` tablosu + `/tekneler` ekranı
    (liste + ekle/düzenle) tamamlandı, kullanıcı testi bekleniyor
-2. **Kişi Tanımları** ✅ (tablo) — `Kisiler`; ekran/UI henüz yok
+2. **Kişi Tanımları** ✅ — `Kisiler` tablosu + `/kisiler` ekranı (liste +
+   ekle/düzenle, Firma Adı autocomplete, koşullu Yasaklanma Sebebi
+   alanı) tamamlandı, kullanıcı testi bekleniyor
 3. **Araç Tanımları** ✅ (tablo) — `Araclar`; ekran/UI henüz yok
 4. **Belge Tanımları** ✅ (tablo) — `KisiBelgeleri`, `AracBelgeleri`
    (kural/kontrol listesi tabloları); ekran/UI henüz yok
