@@ -80,7 +80,8 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 2. **Kişi Tanımları** ✅ (kısmi) — `Kisiler` tablosu ve migration'ları
    uygulandı; ekran/UI henüz yok. Kişi–Tekne ilişkisi (bkz. Açık Konular)
    ayrı bir migration olarak bekliyor.
-3. **Araç Tanımları** — araç kayıtlarının tutulduğu tablo/ekran
+3. **Araç Tanımları** ✅ (kısmi) — `Araclar` tablosu ve migration'ı
+   uygulandı; ekran/UI henüz yok
 4. **Belge Tanımları** — kontrol edilecek belge türlerinin parametrik
    tanımı ve hangi durumlarda sorgulanacaklarının kuralları
 5. **Kişi Giriş/Çıkış Takip Ekranı** — tablette sürekli açık kalan ana
@@ -121,9 +122,17 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 - **Henüz yok**: bu niteliklerin hangi tekne(ler)e bağlı olduğu — bkz.
   Açık Konular
 
-### Araç (Vehicle)
-- Kişi kaydına benzer temel bilgiler (plaka, marka/model vb. — netleşecek)
-- Araç sahibi/kullanıcısı kişi ile ilişki
+### Araç (Vehicle) — uygulandı (`Araclar` tablosu)
+- Takip Numarası — `nvarchar(50)`, **unique** (plaka veya vinç/vidanjör/
+  kompresör/basınçlı kap gibi ekipmanlar için farklı bir seri no olabilir,
+  sabit format zorunlu değil)
+- Araç Türü — sabit tanımlı enum: `Arac` (Araç), `Vinc` (Vinç),
+  `Vidanjor` (Vidanjör), `Kompresor` (Kompresör), `BasincliKap`
+  (Basınçlı Kap); veritabanında metin olarak saklanır
+- Firma Adı, Aktif/Pasif, Yasaklanma Sebebi — Kişi tablosuyla birebir
+  aynı yaklaşım (serbest metin + autocomplete index; CHECK constraint ile
+  Yasaklanma Sebebi yalnızca Pasif iken doldurulabilir)
+- **Henüz yok**: araç–kişi ilişkisi (sahibi/kullanıcısı) — netleşecek
 
 ### Belge Tanımı (DocumentType) — Parametrik
 - Belge Adı
@@ -191,6 +200,8 @@ Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konula
   modellenmedi (2026-08-05 itibarıyla bilerek ertelendi). Karara
   bağlanması gereken: bir kişi birden fazla tekneyle ilişkilendirilebilir
   mi (örn. bir kaptan birden fazla teknede çalışıyorsa)?
+- **Araç–Kişi ilişkisi**: Bir aracın sahibi/kullanıcısı olan kişi nasıl
+  tutulacak (tek kişi mi, birden fazla mı)? Henüz modellenmedi.
 
 ## Güvenlik / Gizli Bilgi Yönetimi
 

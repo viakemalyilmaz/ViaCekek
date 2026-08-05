@@ -12,6 +12,7 @@ public class ApplicationDbContext(
 {
     public DbSet<Tekne> Tekneler => Set<Tekne>();
     public DbSet<Kisi> Kisiler => Set<Kisi>();
+    public DbSet<Arac> Araclar => Set<Arac>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -32,6 +33,22 @@ public class ApplicationDbContext(
         // Yasaklanma Sebebi yalnızca Pasif kişilerde girilebilir.
         builder.Entity<Kisi>().ToTable(t => t.HasCheckConstraint(
             "CK_Kisiler_YasaklanmaSebebi_Aktif",
+            "[Aktif] = 1 AND [YasaklanmaSebebi] IS NULL OR [Aktif] = 0"));
+
+        builder.Entity<Arac>()
+            .HasIndex(a => a.TakipNumarasi)
+            .IsUnique();
+
+        builder.Entity<Arac>()
+            .HasIndex(a => a.FirmaAdi);
+
+        builder.Entity<Arac>()
+            .Property(a => a.AracTuru)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Entity<Arac>().ToTable(t => t.HasCheckConstraint(
+            "CK_Araclar_YasaklanmaSebebi_Aktif",
             "[Aktif] = 1 AND [YasaklanmaSebebi] IS NULL OR [Aktif] = 0"));
     }
 
