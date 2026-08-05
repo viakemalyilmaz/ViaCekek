@@ -89,6 +89,33 @@ tek taraflı yapılmaz.
   test eder, onay sonrası sıradaki modüle geçilir. Birden fazla ekran
   arka arkaya, teste açılmadan inşa edilmez.
 
+## Sıradaki Adım (2026-08-05 sonunda kaldığımız yer)
+
+Tüm tanım/kural ekranları (Tekne, Kişi, Kişi Belgeleri, Araç, Araç
+Belgeleri, Kullanıcılar) tamamlandı ve kullanıcı tarafından test
+edilebilir durumda. Çekek Takip ekranına başlamadan hemen önce akış
+üzerine konuşuldu ve önemli bir mimari karar değişti (bkz. İş Kuralları
+> Çekek Takip Akışı ve Veri Modeli > Belge Durumu) — **ama kodlanmadı,
+sadece planlandı.** Yarın buradan devam:
+
+1. `KisiBelgeKontrolleri`/`AracBelgeKontrolleri` şemasını değiştir:
+   `KisiId`/`AracId` ekle (zorunlu), `CekekTakipId`'yi opsiyonel yap,
+   `UNIQUE(KisiId, KisiBelgeId)` / `UNIQUE(AracId, AracBelgeId)` ekle.
+   Migration üret, SQL'i göster, onay al, uygula.
+2. `/kisiler` ekranına belge girişi bölümü ekle: kişiye ait tüm aktif
+   `KisiBelgeleri` kurallarını listele (ziyaret sebebiyle filtrelenmez,
+   çünkü henüz bir ziyaret yok), her biri için Alındı/Geçerlilik Tarihi
+   girilebilsin.
+3. `/araclar` ekranına aynısını ekle — ama `AracBelgeleri` kuralları o
+   aracın kendi `AracTuru`süne göre (`GecerliArac`/`GecerliVinc`/...)
+   otomatik filtrelenerek gösterilecek.
+4. Ancak bundan sonra Çekek Takip ekranını (`/cekektakip` gibi) kodlamaya
+   başla: kimlik/takip no sorgula → kayıt + güncel belge durumu tam mı
+   kontrol et → eksikse Kişi/Araç Tanımları'na yönlendir → tamamsa
+   tek adımda giriş/çıkış kaydı düş.
+5. Son olarak bir board/liste ekranı (son giren üstte) — tasarımı henüz
+   konuşulmadı, kullanıcıyla birlikte netleştirilecek.
+
 ## Modüller (Geliştirme Sırası)
 
 Not: Kişi ve Araç giriş/çıkış takibi tek bir ekranda (Çekek Takip)
@@ -111,9 +138,9 @@ Belgeleri yapıldı — Araç ve Araç Belgeleri ekranları sonraki adımlar.
 5. **Araç Belgeleri** ✅ — `AracBelgeleri` tablosu + `/aracbelgeleri`
    ekranı (kural tanımı: belge adı, kontrol kuralı, araç türü
    uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
-6. **Çekek Takip Ekranı** ✅ (tablo) — `CekekTakipleri` (hem kişi hem
-   araç giriş/çıkışı tek tabloda); tablette sürekli açık kalan ana
-   operasyon ekranı; ekran/UI henüz yok
+6. **Çekek Takip Ekranı** ⚠️ kısmen — `CekekTakipleri` tablosu var ama
+   belge durumu şeması revize edilecek, ekran/UI henüz yok (bkz.
+   Sıradaki Adım — yarından devam)
 7. **Zamanlayıcı / Durum Güncelleme Motoru** — parametrik kurallara göre
    giriş/çıkış kayıtlarının durumunu otomatik güncelleyen arka plan
    servisi; henüz başlanmadı
@@ -185,16 +212,28 @@ ayrı tablolarda (altta).
     `GecerliKontrol`, `GecerliMalzemeAlma`, `GecerliMalzemeBirakma`,
     `GecerliIskeleKurma` (bkz. Ziyaret Sebebi enum'u)
 
-### Belge Kontrol Logları — `KisiBelgeKontrolleri` / `AracBelgeKontrolleri` (uygulandı)
+### Belge Durumu — `KisiBelgeKontrolleri` / `AracBelgeKontrolleri` (⚠️ ŞEMASI DEĞİŞECEK, bkz. Sıradaki Adım)
 
-Kural tablolarının aksine bunlar **gerçek kontrol olaylarının kaydıdır**
-(log): her `CekekTakip` girişinde ilgili belgeler kontrol edildikçe yeni
-satır eklenir, üzerine yazılmaz (tekillik kısıtı yok).
+**2026-08-05 sonunda mevcut hâli (uygulanmış durum):** bunlar "gerçek
+kontrol olaylarının kaydı" (log) olarak tasarlandı — her `CekekTakip`
+girişinde ilgili belgeler kontrol edildikçe yeni satır eklenir, üzerine
+yazılmaz (tekillik kısıtı yok). Alanlar: `CekekTakipId` (hangi giriş
+sırasında kontrol yapıldığı, zorunlu), `KisiBelgeId`/`AracBelgeId` (hangi
+kurala göre), `AlindiSonucu` (bool), `GecerlilikTarihiSonucu` (nullable
+DateTime).
 
-- `CekekTakipId` — hangi giriş sırasında kontrol yapıldığı
-- `KisiBelgeId` / `AracBelgeId` — hangi kurala göre kontrol edildiği
-- `AlindiSonucu` (bool), `GecerlilikTarihiSonucu` (nullable DateTime) —
-  kontrolde bulunan gerçek sonuçlar
+**Kullanıcıyla konuşulan yeni plan (henüz UYGULANMADI — sıradaki iş):**
+bu tasarım, "belge girişi sadece bir Çekek Takip girişi sırasında
+yapılabilir" varsayımına dayanıyordu. Ama asıl akış şu: belge girişi
+**Kişi/Araç Tanımları ekranlarında, kayıt anında** yapılmalı (henüz
+hiçbir CekekTakip yokken). Bu yüzden tablo, kişiye/araca bağlı **güncel
+durum** tutan bir tabloya dönüşecek:
+- `KisiId`/`AracId` eklenecek (zorunlu)
+- `CekekTakipId` **opsiyonel** hale gelecek (yalnızca bir girişte
+  teyit/güncelleme yapılırsa doldurulur)
+- `UNIQUE(KisiId, KisiBelgeId)` / `UNIQUE(AracId, AracBelgeId)` kısıtı
+  eklenecek (bir kişi/araç × bir belge kuralı = tek güncel satır, artık
+  log değil, upsert edilen durum)
 
 ### Çekek Takip — `CekekTakipleri` (uygulandı)
 
@@ -215,30 +254,34 @@ Hem kişi hem araç giriş/çıkışları **tek tabloda** tutulur.
 
 ## İş Kuralları
 
-### Kişi Giriş Akışı (Çekek Takip ekranı)
-1. Kimlik numarası sorgulanır (`Kisiler.KimlikNumarasi`).
-2. **Kayıt yoksa** → kişi kayıt ekranına yönlendirilir (yeni kişi
-   oluşturma).
-3. **Kayıt varsa** → süreç başlar. Pratiklik açısından kimlik numarası ve
-   ziyaret sebebi aynı ekranda birlikte sorulabilir.
-4. **KVKK onayı**: Kaptan ve Tekne Sahibi gibi istisnalar hariç, tüm
-   ziyaretçilerden `Kisi.KvkkOnayFormuAlindi`/`KvkkOnayDurumu` üzerinden
-   takip edilir/istenir.
-5. Seçilen `ZiyaretSebebi`ye göre, `KisiBelgeleri` tablosunda o sebep için
-   işaretli (`GecerliCalisma` vb.) ve aktif olan belgeler bulunur, her
-   biri için `KisiBelgeKontrolleri`ne bir kontrol kaydı düşülür (Alındı
-   ve varsa Geçerlilik Tarihi kontrolü).
-6. Belge kontrolünden geçen kişi için `CekekTakipleri`de yeni bir satır
-   açılır: giriş tarihi/saati ve işlemi yapan kullanıcı (audit alanları
-   üzerinden) kaydedilir.
+### Çekek Takip Akışı (2026-08-05'te netleşen güncel plan — henüz UYGULANMADI)
 
-### Araç Giriş Akışı (Çekek Takip ekranı — aynı tablo, aynı ekran)
-- Kişi akışına birebir paralel: Takip Numarası sorgulanır
-  (`Araclar.TakipNumarasi`), araç türüne (`AracTuru`) göre
-  `AracBelgeleri`nde işaretli belgeler bulunur, `AracBelgeKontrolleri`ne
-  kontrol kaydı düşülür, sonra `CekekTakipleri`de yeni satır açılır.
-- Kişi ve araç girişleri **aynı `CekekTakipleri` tablosunda**, ayrı
-  satırlar olarak tutulur (bkz. Veri Modeli).
+Amaç: kontrolden geçenlerin girişini, sahadan çıkanların çıkışını
+**hızlıca** kaydetmek. Bu ekranda hız çok önemli — belge girişi burada
+YAPILMAZ, sadece kontrol edilir.
+
+1. Kimlik/Takip numarası sorgulanır.
+2. **Kayıt yoksa** → doğrudan Kişi/Araç Tanımları (kayıt) ekranına
+   yönlendirilir; orada hem kişi/araç bilgisi hem de belge girişleri
+   yapılır. Belgeler tamamsa giriş aşamasına geçilir.
+3. **Kayıt var ama eksik/süresi geçmiş belge tespit edildiyse** → yine
+   Kişi/Araç Tanımları ekranına yönlendirilir, eksikler tamamlanır.
+4. **Belge geçmişi**: bir belge daha önce "Alındı" işaretlenmiş ve
+   geçerlilik tarihi hâlâ geçmemişse, tekrar sorulmaz — görevliye
+   otomatik "tamam" olarak gösterilir. Sadece süresi geçen veya hiç
+   girilmemiş belgeler için Kişi/Araç Tanımları'na yönlendirme tetiklenir.
+5. Her şey tamamsa tek adımda giriş/çıkış kaydı `CekekTakipleri`ye
+   düşülür (giriş tarihi/saati veya çıkış tarihi/saati, işlemi yapan
+   kullanıcı audit alanlarından).
+6. Kişi ve araç girişleri **aynı `CekekTakipleri` tablosunda**, ayrı
+   satırlar olarak tutulur (bkz. Veri Modeli).
+7. Ayrıca bir **board/liste ekranı** yapılacak: giriş sırasına göre, son
+   giren en üstte olacak şekilde güncel/son girişleri listeleyecek —
+   tasarımı henüz konuşulmadı, ayrı bir adım.
+
+Eski plan (referans, artık geçerli değil): önceden "belge kontrolü de
+Çekek Takip sırasında, her girişte yeniden yapılır" varsayılmıştı — bu
+kullanıcıyla konuşulup değiştirildi (yukarıdaki yeni akış geçerli).
 
 ### Zamanlayıcı / Otomatik Durum Güncelleme
 - Belirlenecek kurallara göre (örn. girişten 1 saat sonra durum
@@ -290,6 +333,14 @@ Kullanıcı rolleri → 3 sabit rol ile netleşti (bkz. Kullanıcı Yönetimi).
 - `Routes.razor`: yetkisiz ama zaten giriş yapmış bir kullanıcı artık
   login sayfasına döngüye girmiyor, "Bu sayfaya erişim yetkiniz yok"
   mesajı görüyor.
+- **Login ekranı sadeleştirildi**: dış servisle giriş bölümü, "Register as
+  a new user" ve "Resend email confirmation" linkleri kaldırıldı (hiçbiri
+  bu projede kullanılmıyor/çalışmıyor). "Forgot your password?" de
+  kaldırıldı — gerçek e-posta sunucusu olmadığı için hiç çalışmayacaktı;
+  yerine "şifrenizi unuttuysanız yöneticinizle iletişime geçin" notu
+  kondu. Karşılığında `/kullanicilar` ekranına her kullanıcı satırında
+  **Şifre Sıfırla** özelliği eklendi (`UserManager.ResetPasswordAsync`,
+  e-postaya ihtiyaç duymadan Yönetici doğrudan yeni şifre belirler).
 
 ## Güvenlik / Gizli Bilgi Yönetimi
 
