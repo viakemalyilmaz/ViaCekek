@@ -79,8 +79,33 @@ else
                             }
                         </select>
                     </td>
-                    <td></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => SifreSifirlamaBaslat(kullanici)">Şifre Sıfırla</button>
+                    </td>
                 </tr>
+                @if (sifreSifirlananKullaniciId == kullanici.Id)
+                {
+                    <tr>
+                        <td colspan="3">
+                            <EditForm Model="sifreSifirlama" OnValidSubmit="SifreSifirla" class="card card-body">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary />
+                                @if (sifreHataMesaji is not null)
+                                {
+                                    <div class="alert alert-danger">@sifreHataMesaji</div>
+                                }
+                                <div class="mb-2">
+                                    <label class="form-label">@kullanici.Email için yeni şifre</label>
+                                    <InputText type="password" class="form-control" @bind-Value="sifreSifirlama.YeniSifre" />
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-success btn-sm">Şifreyi Değiştir</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="SifreSifirlamaIptal">İptal</button>
+                                </div>
+                            </EditForm>
+                        </td>
+                    </tr>
+                }
             }
         </tbody>
     </table>
@@ -91,6 +116,10 @@ else
     private YeniKullaniciModeli yeniKullanici = new();
     private bool formAcik;
     private string? hataMesaji;
+
+    private string? sifreSifirlananKullaniciId;
+    private SifreSifirlamaModeli sifreSifirlama = new();
+    private string? sifreHataMesaji;
 
     protected override async Task OnInitializedAsync()
     {
@@ -163,6 +192,41 @@ else
         await ListeyiYenile();
     }
 
+    private void SifreSifirlamaBaslat(ApplicationUser kullanici)
+    {
+        sifreSifirlananKullaniciId = kullanici.Id;
+        sifreSifirlama = new SifreSifirlamaModeli();
+        sifreHataMesaji = null;
+    }
+
+    private void SifreSifirlamaIptal()
+    {
+        sifreSifirlananKullaniciId = null;
+        sifreHataMesaji = null;
+    }
+
+    private async Task SifreSifirla()
+    {
+        sifreHataMesaji = null;
+
+        var kullanici = await UserManager.FindByIdAsync(sifreSifirlananKullaniciId!);
+        if (kullanici is null)
+        {
+            sifreHataMesaji = "Kullanıcı bulunamadı, sayfayı yenileyin.";
+            return;
+        }
+
+        var token = await UserManager.GeneratePasswordResetTokenAsync(kullanici);
+        var sonuc = await UserManager.ResetPasswordAsync(kullanici, token, sifreSifirlama.YeniSifre);
+        if (!sonuc.Succeeded)
+        {
+            sifreHataMesaji = string.Join(" ", sonuc.Errors.Select(e => e.Description));
+            return;
+        }
+
+        sifreSifirlananKullaniciId = null;
+    }
+
     private sealed class YeniKullaniciModeli
     {
         [Required, EmailAddress]
@@ -173,5 +237,11 @@ else
 
         [Required]
         public string Rol { get; set; } = Roller.Guvenlik;
+    }
+
+    private sealed class SifreSifirlamaModeli
+    {
+        [Required, MinLength(6)]
+        public string YeniSifre { get; set; } = string.Empty;
     }
 }
