@@ -10,6 +10,9 @@ out/
 *.user
 *.suo
 
+# Claude Code kişisel/oturuma özel ayarlar
+.claude/
+
 # Gizli / ortama özel ayarlar (bkz. CLAUDE.md > Güvenlik)
 appsettings.Development.json
 appsettings.Production.json
