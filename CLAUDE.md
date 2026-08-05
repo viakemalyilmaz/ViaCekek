@@ -71,24 +71,33 @@ tek taraflı yapılmaz.
   `IHttpContextAccessor` **kullanılmıyor**). Senkron `SaveChanges` bilerek
   desteklenmiyor — tüm kayıt işlemleri `SaveChangesAsync` ile yapılmalı.
 
+## Geliştirme Süreci
+
+- Şema değişiklikleri: migration üretilir → SQL kullanıcıya gösterilir →
+  onay sonrası `dotnet ef database update` ile uygulanır (bkz. Proje
+  Özeti).
+- **Ekranlar** (2026-08-05'ten itibaren): bir ekranın UI'ı bitip build
+  temiz geçince kullanıcıya haber verilir, kullanıcı tarayıcıda kendisi
+  test eder, onay sonrası sıradaki modüle geçilir. Birden fazla ekran
+  arka arkaya, teste açılmadan inşa edilmez.
+
 ## Modüller (Geliştirme Sırası)
 
-Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
+Not: Kişi ve Araç giriş/çıkış takibi tek bir ekranda (Çekek Takip)
+birleştirildi — aşağıdaki 5. madde eski "Kişi Giriş/Çıkış" ve "Araç
+Giriş/Çıkış" maddelerinin yerine geçer.
 
-1. **Tekne Tanımları** ✅ — tekne kayıtlarının tutulduğu tablo/ekran
-   (`Tekneler` tablosu ve migration'ları uygulandı; ekran/UI henüz yok)
-2. **Kişi Tanımları** ✅ (kısmi) — `Kisiler` tablosu ve migration'ları
-   uygulandı; ekran/UI henüz yok. Kişi–Tekne ilişkisi (bkz. Açık Konular)
-   ayrı bir migration olarak bekliyor.
-3. **Araç Tanımları** ✅ (kısmi) — `Araclar` tablosu ve migration'ı
-   uygulandı; ekran/UI henüz yok
-4. **Belge Tanımları** — kontrol edilecek belge türlerinin parametrik
-   tanımı ve hangi durumlarda sorgulanacaklarının kuralları
-5. **Kişi Giriş/Çıkış Takip Ekranı** — tablette sürekli açık kalan ana
-   operasyon ekranı
-6. **Araç Giriş/Çıkış Takip Ekranı** — araçlar için benzer takip ekranı
-7. **Zamanlayıcı / Durum Güncelleme Motoru** — parametrik kurallara göre
-   ziyaret durumlarını otomatik güncelleyen arka plan servisi
+1. **Tekne Tanımları** ✅ (tablo) — `Tekneler`; ekran/UI henüz yok
+2. **Kişi Tanımları** ✅ (tablo) — `Kisiler`; ekran/UI henüz yok
+3. **Araç Tanımları** ✅ (tablo) — `Araclar`; ekran/UI henüz yok
+4. **Belge Tanımları** ✅ (tablo) — `KisiBelgeleri`, `AracBelgeleri`
+   (kural/kontrol listesi tabloları); ekran/UI henüz yok
+5. **Çekek Takip Ekranı** ✅ (tablo) — `CekekTakipleri` (hem kişi hem
+   araç giriş/çıkışı tek tabloda); tablette sürekli açık kalan ana
+   operasyon ekranı; ekran/UI henüz yok
+6. **Zamanlayıcı / Durum Güncelleme Motoru** — parametrik kurallara göre
+   giriş/çıkış kayıtlarının durumunu otomatik güncelleyen arka plan
+   servisi; henüz başlanmadı
 
 ## Veri Modeli (Kavramsal Taslak)
 
@@ -119,8 +128,12 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
 - Ziyaretçi niteliği: `TekneSahibi`, `Kaptan`, `TeknePersoneli` —
   birbirini dışlamayan bağımsız checkbox'lar (bir kişi aynı anda birden
   fazlası olabilir)
-- **Henüz yok**: bu niteliklerin hangi tekne(ler)e bağlı olduğu — bkz.
-  Açık Konular
+- KVKK: `KvkkOnayFormuAlindi` (bool), `KvkkOnayDurumu` (enum: Bilinmiyor/
+  OnayVerildi/OnayVerilmedi), `KvkkOnayTarihi` (nullable) — yalnızca
+  güncel durum tutulur, değişiklik geçmişi audit alanlarından
+  (Guncelleyen/GuncellemeTarihi) izlenir
+- Tekne ilişkisi kalıcı bir alan olarak **yok** — hangi tekneyle ilgili
+  olduğu her girişte `CekekTakip.TekneId` ile ayrıca tutulur (bkz. altta)
 
 ### Araç (Vehicle) — uygulandı (`Araclar` tablosu)
 - Takip Numarası — `nvarchar(50)`, **unique** (plaka veya vinç/vidanjör/
@@ -134,74 +147,111 @@ Modüller sırasıyla, birlikte kararlaştırılan sırayla geliştirilecek:
   Yasaklanma Sebebi yalnızca Pasif iken doldurulabilir)
 - **Henüz yok**: araç–kişi ilişkisi (sahibi/kullanıcısı) — netleşecek
 
-### Belge Tanımı (DocumentType) — Parametrik
-- Belge Adı
-- Geçerlilik süresi/tarihi kuralı
-- Bu belgenin hangi durumlarda (ziyaretçi tipi, ziyaret tipi vb.)
-  sorgulanacağını belirleyen kural(lar)
+### Belge Kuralları — `KisiBelgeleri` ve `AracBelgeleri` (uygulandı)
 
-### Ziyaret / Giriş-Çıkış Kaydı (Visit)
-- İlgili Kişi
-- Ziyaret Sebebi
-- Ziyaret Tipi (örn. Çalışma / Ziyaret / Diğer — netleşecek)
-- KVKK Onay durumu (bkz. iş kuralları)
-- Belge kontrol durumu/sonuçları
-- Giriş Tarihi/Saati, işlemi yapan kullanıcı
-- Çıkış Tarihi/Saati, işlemi yapan kullanıcı
-- Durum (örn. Sahada / Çıkış Yaptı / Süresi Geçti vb. — netleşecek)
-- İlişkili Araç (varsa)
+Kişi ve Araç için birebir aynı mantıkta, birbirinden bağımsız iki tablo.
+Bunlar **kişiye/araca değil kurala ait** tablolardır — "hangi belge, ne
+zaman, nasıl kontrol edilir" tanımını tutar; gerçek kontrol sonuçları
+ayrı tablolarda (altta).
+
+- Belge Tanımı — serbest metin (nvarchar), ayrı bir lookup tablosu yok
+- `Alindi` (bool) ve `GecerlilikTarihiKontrolu` (bool): bunlar VERİ değil
+  **kontrol kuralıdır** — "bu belge için alındı kontrolü yapılsın mı" /
+  "ayrıca geçerlilik tarihi de kontrol edilsin mi" anlamına gelir
+- Aktif/Pasif
+- Uygulanabilirlik checkbox'ları (birbirini dışlamaz):
+  - `AracBelgeleri`: `GecerliArac`, `GecerliVinc`, `GecerliVidanjor`,
+    `GecerliKompresor`, `GecerliBasincliKap` (bkz. Araç Türü enum'u)
+  - `KisiBelgeleri`: `GecerliCalisma`, `GecerliGorusme`, `GecerliKesif`,
+    `GecerliKontrol`, `GecerliMalzemeAlma`, `GecerliMalzemeBirakma`
+    (bkz. Ziyaret Sebebi enum'u)
+
+### Belge Kontrol Logları — `KisiBelgeKontrolleri` / `AracBelgeKontrolleri` (uygulandı)
+
+Kural tablolarının aksine bunlar **gerçek kontrol olaylarının kaydıdır**
+(log): her `CekekTakip` girişinde ilgili belgeler kontrol edildikçe yeni
+satır eklenir, üzerine yazılmaz (tekillik kısıtı yok).
+
+- `CekekTakipId` — hangi giriş sırasında kontrol yapıldığı
+- `KisiBelgeId` / `AracBelgeId` — hangi kurala göre kontrol edildiği
+- `AlindiSonucu` (bool), `GecerlilikTarihiSonucu` (nullable DateTime) —
+  kontrolde bulunan gerçek sonuçlar
+
+### Çekek Takip — `CekekTakipleri` (uygulandı)
+
+Hem kişi hem araç giriş/çıkışları **tek tabloda** tutulur.
+
+- `KisiId` / `AracId` — nullable FK, bir satırda ikisinden **tam biri**
+  dolu olur (CHECK constraint ile garanti edilir)
+- Giriş anı **anlık görüntüsü** (snapshot): `KimlikNumarasi`,
+  `TakipNumarasi`, `AdSoyad`, `FirmaAdi`, `Telefon` — Kisi/Arac kaydı
+  sonradan değişse bile o günkü kayıt bozulmaz
+- `TekneId` — nullable FK, bu girişin hangi tekneyle ilgili olduğu
+  (kalıcı Kişi–Tekne ilişkisi yerine her girişte ayrı ayrı tutulur)
+- `GirisTarihi`/`GirisSaati`, `CikisTarihi`/`CikisSaati` — tarih ve saat
+  ayrı kolonlar (`date`/`time`)
+- `ZiyaretSebebi` — sabit enum: Çalışma, Görüşme, Keşif, Kontrol,
+  Malzeme Alma, Malzeme Bırakma
+- `Aciklama` — serbest metin
 
 ## İş Kuralları
 
-### Kişi Giriş Akışı
-1. Kimlik numarası sorgulanır.
+### Kişi Giriş Akışı (Çekek Takip ekranı)
+1. Kimlik numarası sorgulanır (`Kisiler.KimlikNumarasi`).
 2. **Kayıt yoksa** → kişi kayıt ekranına yönlendirilir (yeni kişi
    oluşturma).
 3. **Kayıt varsa** → süreç başlar. Pratiklik açısından kimlik numarası ve
    ziyaret sebebi aynı ekranda birlikte sorulabilir.
 4. **KVKK onayı**: Kaptan ve Tekne Sahibi gibi istisnalar hariç, tüm
-   ziyaretçilerden KVKK onayı takip edilir/istenir.
-5. **Ziyaret tipi = Çalışma** ise, ek olarak gerekli belgelerin (belge
-   tanımı tablosundaki parametrik kurallara göre) kontrolü yapılır.
-6. Belge kontrolünden geçen kişi sahaya giriş yapar; giriş tarihi/saati ve
-   işlemi yapan kullanıcı kaydedilir.
+   ziyaretçilerden `Kisi.KvkkOnayFormuAlindi`/`KvkkOnayDurumu` üzerinden
+   takip edilir/istenir.
+5. Seçilen `ZiyaretSebebi`ye göre, `KisiBelgeleri` tablosunda o sebep için
+   işaretli (`GecerliCalisma` vb.) ve aktif olan belgeler bulunur, her
+   biri için `KisiBelgeKontrolleri`ne bir kontrol kaydı düşülür (Alındı
+   ve varsa Geçerlilik Tarihi kontrolü).
+6. Belge kontrolünden geçen kişi için `CekekTakipleri`de yeni bir satır
+   açılır: giriş tarihi/saati ve işlemi yapan kullanıcı (audit alanları
+   üzerinden) kaydedilir.
 
-### Araç Giriş Akışı
-- Kişi akışına benzer şekilde; araç bilgileri sorgulanır/kaydedilir ve
-  giriş/çıkış takibi ayrı bir ekranda yapılır.
+### Araç Giriş Akışı (Çekek Takip ekranı — aynı tablo, aynı ekran)
+- Kişi akışına birebir paralel: Takip Numarası sorgulanır
+  (`Araclar.TakipNumarasi`), araç türüne (`AracTuru`) göre
+  `AracBelgeleri`nde işaretli belgeler bulunur, `AracBelgeKontrolleri`ne
+  kontrol kaydı düşülür, sonra `CekekTakipleri`de yeni satır açılır.
+- Kişi ve araç girişleri **aynı `CekekTakipleri` tablosunda**, ayrı
+  satırlar olarak tutulur (bkz. Veri Modeli).
 
 ### Zamanlayıcı / Otomatik Durum Güncelleme
 - Belirlenecek kurallara göre (örn. girişten 1 saat sonra durum
   güncellenir, sonraki güncelleme 15 dakika sonra tekrar yapılır gibi)
-  ziyaret kayıtlarının durumu arka planda otomatik güncellenir.
-- Bu kurallar parametrik olacak (sabit kod içine gömülmeyecek).
+  `CekekTakipleri` kayıtlarının durumu arka planda otomatik güncellenir.
+- Bu kurallar parametrik olacak (sabit kod içine gömülmeyecek). Henüz
+  `CekekTakipleri`de bir "Durum" alanı yok — bu motor tasarlanırken
+  eklenecek.
 
 ## Açık Konular / Netleştirilecekler
 
 Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konular:
 
-- **Ziyaret Tipleri**: "Çalışma" dışında hangi ziyaret tipleri olacak,
-  tam liste nedir?
 - **KVKK onayı nasıl alınacak**: Tablette imza/onay ekranı mı, yoksa
   fiziksel form mu, yoksa tek tık onay mı?
-- **Belge kontrol kuralları**: Belge–ziyaretçi tipi/ziyaret tipi
-  eşleştirme kuralları tam olarak nasıl parametrize edilecek (matris
-  ekranı, kural motoru vb.)?
 - **Zamanlayıcı kuralları**: Durum güncelleme aralıkları (1 saat, 15 dk
   gibi örnekler verildi) ve bu güncellemelerin ne anlama geldiği (uyarı mı,
-  otomatik çıkış mı, bildirim mi?) netleşmeli.
+  otomatik çıkış mı, bildirim mi?) netleşmeli. `CekekTakipleri`de henüz
+  bir "Durum" alanı yok.
 - **Kullanıcı rolleri**: Güvenlik görevlisi, yönetici gibi rollerin
   yetkileri (örn. kim yeni kişi/tekne/araç tanımlayabilir, kim raporlara
   erişebilir) netleşmeli.
 - **Raporlama ihtiyaçları**: Sahada kimler var, geçmiş giriş/çıkış
   raporları gibi ihtiyaçlar var mı, varsa kapsamı nedir?
-- **Tekne–Kişi ilişkisi**: `TekneSahibi`/`Kaptan`/`TeknePersoneli`
-  işaretli bir kişinin hangi tekne(ler)e bağlı olduğu henüz
-  modellenmedi (2026-08-05 itibarıyla bilerek ertelendi). Karara
-  bağlanması gereken: bir kişi birden fazla tekneyle ilişkilendirilebilir
-  mi (örn. bir kaptan birden fazla teknede çalışıyorsa)?
 - **Araç–Kişi ilişkisi**: Bir aracın sahibi/kullanıcısı olan kişi nasıl
   tutulacak (tek kişi mi, birden fazla mı)? Henüz modellenmedi.
+
+Çözülenler (referans için): Ziyaret Tipleri → `ZiyaretSebebi` sabit
+enum'u ile netleşti (Çalışma/Görüşme/Keşif/Kontrol/Malzeme Alma/Malzeme
+Bırakma). Belge kontrol kuralları → `KisiBelgeleri`/`AracBelgeleri`
+üzerindeki checkbox'larla parametrize edildi. Tekne–Kişi ilişkisi →
+kalıcı bir alan yerine her girişte `CekekTakip.TekneId` ile çözüldü.
 
 ## Güvenlik / Gizli Bilgi Yönetimi
 

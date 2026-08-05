@@ -13,6 +13,11 @@ public class ApplicationDbContext(
     public DbSet<Tekne> Tekneler => Set<Tekne>();
     public DbSet<Kisi> Kisiler => Set<Kisi>();
     public DbSet<Arac> Araclar => Set<Arac>();
+    public DbSet<KisiBelge> KisiBelgeleri => Set<KisiBelge>();
+    public DbSet<AracBelge> AracBelgeleri => Set<AracBelge>();
+    public DbSet<KisiBelgeKontrol> KisiBelgeKontrolleri => Set<KisiBelgeKontrol>();
+    public DbSet<AracBelgeKontrol> AracBelgeKontrolleri => Set<AracBelgeKontrol>();
+    public DbSet<CekekTakip> CekekTakipleri => Set<CekekTakip>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -35,6 +40,11 @@ public class ApplicationDbContext(
             "CK_Kisiler_YasaklanmaSebebi_Aktif",
             "[Aktif] = 1 AND [YasaklanmaSebebi] IS NULL OR [Aktif] = 0"));
 
+        builder.Entity<Kisi>()
+            .Property(k => k.KvkkOnayDurumu)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Entity<Arac>()
             .HasIndex(a => a.TakipNumarasi)
             .IsUnique();
@@ -50,6 +60,44 @@ public class ApplicationDbContext(
         builder.Entity<Arac>().ToTable(t => t.HasCheckConstraint(
             "CK_Araclar_YasaklanmaSebebi_Aktif",
             "[Aktif] = 1 AND [YasaklanmaSebebi] IS NULL OR [Aktif] = 0"));
+
+        // Log tabloları: aynı kişi/araç aynı belge kuralı için tekrar tekrar
+        // kontrol edilebilir, tekillik kısıtı yok — sadece sorgu için index.
+        builder.Entity<AracBelgeKontrol>()
+            .HasIndex(abk => new { abk.CekekTakipId, abk.AracBelgeId });
+
+        builder.Entity<KisiBelgeKontrol>()
+            .HasIndex(kbk => new { kbk.CekekTakipId, kbk.KisiBelgeId });
+
+        builder.Entity<CekekTakip>()
+            .Property(c => c.ZiyaretSebebi)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        // Bir CekekTakip satırı ya kişi ya araç girişidir, ikisi birden olamaz.
+        builder.Entity<CekekTakip>().ToTable(t => t.HasCheckConstraint(
+            "CK_CekekTakipleri_KisiVeyaArac",
+            "([KisiId] IS NOT NULL AND [AracId] IS NULL) OR ([KisiId] IS NULL AND [AracId] IS NOT NULL)"));
+
+        // Kisi/Arac/Tekne silinse bile geçmiş giriş/çıkış kayıtları kalır
+        // (snapshot alanları zaten bağımsız), yalnızca bağlantı NULL'a düşer.
+        builder.Entity<CekekTakip>()
+            .HasOne(c => c.Kisi)
+            .WithMany()
+            .HasForeignKey(c => c.KisiId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<CekekTakip>()
+            .HasOne(c => c.Arac)
+            .WithMany()
+            .HasForeignKey(c => c.AracId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<CekekTakip>()
+            .HasOne(c => c.Tekne)
+            .WithMany()
+            .HasForeignKey(c => c.TekneId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 
     // Blazor Server interactive circuit'lerde HttpContext güvenilir olmadığından

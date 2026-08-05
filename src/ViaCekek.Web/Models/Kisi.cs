@@ -34,4 +34,10 @@ public class Kisi : AuditableEntity
     public bool TekneSahibi { get; set; }
     public bool Kaptan { get; set; }
     public bool TeknePersoneli { get; set; }
+
+    // KVKK: yalnızca güncel durum tutulur, değişiklik geçmişi
+    // Guncelleyen/GuncellemeTarihi audit alanlarından izlenir.
+    public bool KvkkOnayFormuAlindi { get; set; }
+    public KvkkOnayDurumu KvkkOnayDurumu { get; set; } = KvkkOnayDurumu.Bilinmiyor;
+    public DateTime? KvkkOnayTarihi { get; set; }
 }
