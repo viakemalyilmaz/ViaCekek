@@ -3,7 +3,14 @@
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>
-                <RedirectToLogin />
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <p class="text-danger m-3">Bu sayfaya erişim yetkiniz yok.</p>
+                }
+                else
+                {
+                    <RedirectToLogin />
+                }
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

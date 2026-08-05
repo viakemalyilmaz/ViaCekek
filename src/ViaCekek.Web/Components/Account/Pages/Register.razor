@@ -1,6 +1,8 @@
 ﻿@page "/Account/Register"
+@attribute [Authorize(Roles = Roller.Yonetici)]
 
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
 @using System.Text
 @using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity

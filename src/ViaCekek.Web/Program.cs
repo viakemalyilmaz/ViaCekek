@@ -29,6 +29,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = false)
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
@@ -36,6 +37,27 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 var app = builder.Build();
+
+// Roller ve ilk yönetici hesabını uygulama başlarken oluştur/garanti et.
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+    foreach (var rol in Roller.Hepsi)
+    {
+        if (!await roleManager.RoleExistsAsync(rol))
+        {
+            await roleManager.CreateAsync(new IdentityRole(rol));
+        }
+    }
+
+    var ilkYonetici = await userManager.FindByEmailAsync("kemalyilmaz@viadmc.com");
+    if (ilkYonetici is not null && !await userManager.IsInRoleAsync(ilkYonetici, Roller.Yonetici))
+    {
+        await userManager.AddToRoleAsync(ilkYonetici, Roller.Yonetici);
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

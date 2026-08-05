@@ -1,5 +1,5 @@
 @page "/tekneler"
-@attribute [Authorize]
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore

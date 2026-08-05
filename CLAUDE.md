@@ -248,9 +248,6 @@ Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konula
   gibi örnekler verildi) ve bu güncellemelerin ne anlama geldiği (uyarı mı,
   otomatik çıkış mı, bildirim mi?) netleşmeli. `CekekTakipleri`de henüz
   bir "Durum" alanı yok.
-- **Kullanıcı rolleri**: Güvenlik görevlisi, yönetici gibi rollerin
-  yetkileri (örn. kim yeni kişi/tekne/araç tanımlayabilir, kim raporlara
-  erişebilir) netleşmeli.
 - **Raporlama ihtiyaçları**: Sahada kimler var, geçmiş giriş/çıkış
   raporları gibi ihtiyaçlar var mı, varsa kapsamı nedir?
 - **Araç–Kişi ilişkisi**: Bir aracın sahibi/kullanıcısı olan kişi nasıl
@@ -261,6 +258,28 @@ enum'u ile netleşti (Çalışma/Görüşme/Keşif/Kontrol/Malzeme Alma/Malzeme
 Bırakma). Belge kontrol kuralları → `KisiBelgeleri`/`AracBelgeleri`
 üzerindeki checkbox'larla parametrize edildi. Tekne–Kişi ilişkisi →
 kalıcı bir alan yerine her girişte `CekekTakip.TekneId` ile çözüldü.
+Kullanıcı rolleri → 3 sabit rol ile netleşti (bkz. Kullanıcı Yönetimi).
+
+## Kullanıcı Yönetimi (uygulandı, 2026-08-05)
+
+- 3 sabit rol (`Data/Roller.cs`): **Yönetici** (her şey: tanım ekranları +
+  Çekek Takip + Kullanıcılar), **Saha Kontrolörü** (tanım ekranları +
+  Çekek Takip, Kullanıcılar hariç), **Güvenlik** (yalnızca Çekek Takip).
+- Roller ve `kemalyilmaz@viadmc.com` → Yönetici ataması, uygulama her
+  başladığında `Program.cs`'de idempotent olarak garanti edilir (yoksa
+  oluşturulur, varsa dokunulmaz).
+- **Kayıt formu artık herkese açık değil**: `/Account/Register`
+  `[Authorize(Roles = Roller.Yonetici)]` ile korunuyor. Ancak bu sayfa
+  kaydı yapan kişiyi otomatik oturum açtırdığı için (kendi kaydını yapan
+  kullanıcı için tasarlanmış) yönetici tarafından **kullanılmamalı** —
+  onun yerine `/kullanicilar` ekranındaki "Yeni Kullanıcı" formu
+  kullanılır (yöneticinin oturumunu bozmadan `UserManager.CreateAsync` +
+  `AddToRoleAsync` ile doğrudan hesap açar).
+- `/kullanicilar` (Yönetici-only): kullanıcı listesi + rol, yeni kullanıcı
+  oluşturma, mevcut kullanıcının rolünü değiştirme.
+- `Routes.razor`: yetkisiz ama zaten giriş yapmış bir kullanıcı artık
+  login sayfasına döngüye girmiyor, "Bu sayfaya erişim yetkiniz yok"
+  mesajı görüyor.
 
 ## Güvenlik / Gizli Bilgi Yönetimi
 
