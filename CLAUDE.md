@@ -64,6 +64,24 @@ tek taraflı yapılmaz.
     kurulduğu için CDN değil, `dotnet new blazor` çıktısından elle
     kopyalandı; offline/tablet güvenilirliği için CDN'e bağımlı değil)
 
+## Tablet/Dokunmatik Uyumluluk (2026-08-06'da başladı)
+
+- `wwwroot/app.css`'te proje geneli için: kök `font-size: 18px` (Bootstrap
+  rem bazlı buton/boşluk ölçüleri orantılı büyür, her ekrana otomatik
+  yayılır), büyütülmüş `.form-check-input` (checkbox) boyutu.
+- Tüm tablolar `<div class="table-responsive">` ile sarmalanır (dar
+  tablet ekranında yatay taşma yerine kaydırma).
+- **Kullanım sıklığına göre önceliklendirme** (kullanıcıyla netleşti):
+  - Sık kullanılacaklar (öncelik): **Çekek Takip/board** (henüz
+    yapılmadı), **Kişiler**, **Araçlar** — bu ikisinde buton'lar
+    büyütüldü (`btn-lg` birincil aksiyonlarda, `btn-sm` yerine normal
+    boyut ikincil aksiyonlarda).
+  - Nadir kullanılacaklar (düşük öncelik, şimdilik sadece
+    `table-responsive` aldı, buton boyutları küçük kaldı): Tekneler,
+    Kullanıcılar, Kişi Belgeleri, Araç Belgeleri.
+- Çekek Takip ekranı yapılırken bu prensipler baştan uygulanmalı: büyük
+  dokunmatik butonlar, büyük yazı tipi, minimum tıklama.
+
 ## Ortak Kurallar (Tüm Tablolar İçin)
 
 - **Audit alanları**: Her tablo `KayitTarihi`, `Kaydeden`,

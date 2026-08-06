@@ -16,7 +16,7 @@
     <div class="alert alert-danger">@hataMesaji</div>
 }
 
-<button class="btn btn-primary mb-3" @onclick="YeniKisiBaslat">+ Yeni Kişi</button>
+<button class="btn btn-lg btn-primary mb-3" @onclick="YeniKisiBaslat">+ Yeni Kişi</button>
 
 @if (formAcik)
 {
@@ -102,8 +102,8 @@
         </fieldset>
 
         <div>
-            <button type="submit" class="btn btn-success">Kaydet</button>
-            <button type="button" class="btn btn-secondary" @onclick="FormuKapat">İptal</button>
+            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">İptal</button>
         </div>
     </EditForm>
 }
@@ -118,6 +118,7 @@ else if (kisiler.Count == 0)
 }
 else
 {
+    <div class="table-responsive">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
@@ -167,12 +168,13 @@ else
                         }
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => DuzenlemeBaslat(kisi)">Düzenle</button>
+                        <button class="btn btn-outline-primary" @onclick="() => DuzenlemeBaslat(kisi)">Düzenle</button>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
+    </div>
 }
 
 @code {

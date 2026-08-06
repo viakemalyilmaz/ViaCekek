@@ -1,3 +1,23 @@
+/* Tablet/dokunmatik uyumluluk: kök font büyütülünce Bootstrap'ın rem
+   bazlı buton/boşluk ölçüleri de orantılı büyür, tüm ekranlara yayılır. */
+html {
+    font-size: 18px;
+}
+
+.form-check-input {
+    width: 1.4em;
+    height: 1.4em;
+    margin-top: 0.2em;
+}
+
+.form-check-label {
+    padding-left: 0.35em;
+}
+
+.table-responsive {
+    -webkit-overflow-scrolling: touch;
+}
+
 h1:focus {
     outline: none;
 }
