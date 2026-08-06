@@ -107,26 +107,29 @@ tek taraflı yapılmaz.
   test eder, onay sonrası sıradaki modüle geçilir. Birden fazla ekran
   arka arkaya, teste açılmadan inşa edilmez.
 
-## Sıradaki Adım (2026-08-05 sonunda kaldığımız yer)
+## Sıradaki Adım (2026-08-06 itibarıyla)
 
-Tüm tanım/kural ekranları (Tekne, Kişi, Kişi Belgeleri, Araç, Araç
-Belgeleri, Kullanıcılar) tamamlandı ve kullanıcı tarafından test
-edilebilir durumda. Çekek Takip ekranına başlamadan hemen önce akış
-üzerine konuşuldu ve önemli bir mimari karar değişti (bkz. İş Kuralları
-> Çekek Takip Akışı ve Veri Modeli > Belge Durumu) — **ama kodlanmadı,
-sadece planlandı.** Yarın buradan devam:
+Tüm tanım/kural ekranları tamamlandı, tablet/dokunmatik uyumluluk
+iyileştirmeleri yapıldı (bkz. ilgili bölüm). Kişi tarafında belge girişi
+de tamamlandı (madde 1-2 aşağıda ✅). Kalan işler:
 
-1. `KisiBelgeKontrolleri`/`AracBelgeKontrolleri` şemasını değiştir:
-   `KisiId`/`AracId` ekle (zorunlu), `CekekTakipId`'yi opsiyonel yap,
-   `UNIQUE(KisiId, KisiBelgeId)` / `UNIQUE(AracId, AracBelgeId)` ekle.
-   Migration üret, SQL'i göster, onay al, uygula.
-2. `/kisiler` ekranına belge girişi bölümü ekle: kişiye ait tüm aktif
-   `KisiBelgeleri` kurallarını listele (ziyaret sebebiyle filtrelenmez,
-   çünkü henüz bir ziyaret yok), her biri için Alındı/Geçerlilik Tarihi
-   girilebilsin.
-3. `/araclar` ekranına aynısını ekle — ama `AracBelgeleri` kuralları o
-   aracın kendi `AracTuru`süne göre (`GecerliArac`/`GecerliVinc`/...)
-   otomatik filtrelenerek gösterilecek.
+1. ✅ `KisiBelgeKontrolleri` şeması değişti: `KisiId` eklendi (zorunlu),
+   `CekekTakipId` opsiyonel oldu, `UNIQUE(KisiId, KisiBelgeId)` eklendi
+   — artık log değil, kişiye bağlı güncel durum tablosu. Migration
+   uygulandı, gerçek DB'ye karşı (upsert + unique constraint + cascade
+   delete) doğrulandı.
+2. ✅ `/kisiler` ekranına belge girişi eklendi: bir kişi kaydedilince
+   (yeni veya düzenleme) form kapanmıyor, altında aktif `KisiBelgeleri`
+   kurallarının tümü (ziyaret sebebiyle filtrelenmiyor, çünkü henüz bir
+   ziyaret yok) Alındı checkbox + varsa Geçerlilik Tarihi ile listeleniyor,
+   ayrı bir "Belgeleri Kaydet" butonuyla `KisiBelgeKontrolleri`ne
+   upsert ediliyor.
+3. **Sırada**: `AracBelgeKontrolleri` için aynı şema değişikliği
+   (`AracId` ekle, `CekekTakipId`'yi opsiyonel yap, `UNIQUE(AracId,
+   AracBelgeId)` ekle), sonra `/araclar` ekranına aynı belge girişi
+   bölümünü ekle — ama `AracBelgeleri` kuralları o aracın kendi
+   `AracTuru`süne göre (`GecerliArac`/`GecerliVinc`/...) otomatik
+   filtrelenerek gösterilecek (Kişi'de olduğu gibi tüm kurallar değil).
 4. Ancak bundan sonra Çekek Takip ekranını (`/cekektakip` gibi) kodlamaya
    başla: kimlik/takip no sorgula → kayıt + güncel belge durumu tam mı
    kontrol et → eksikse Kişi/Araç Tanımları'na yönlendir → tamamsa
@@ -145,8 +148,9 @@ Belgeleri yapıldı — Araç ve Araç Belgeleri ekranları sonraki adımlar.
 1. **Tekne Tanımları** ✅ — `Tekneler` tablosu + `/tekneler` ekranı
    (liste + ekle/düzenle) tamamlandı, kullanıcı testi bekleniyor
 2. **Kişi Tanımları** ✅ — `Kisiler` tablosu + `/kisiler` ekranı (liste +
-   ekle/düzenle, Firma Adı autocomplete, koşullu Yasaklanma Sebebi
-   alanı) tamamlandı, kullanıcı testi bekleniyor
+   ekle/düzenle, Firma Adı autocomplete, koşullu Yasaklanma Sebebi alanı,
+   kayıt sonrası belge girişi bölümü — `KisiBelgeKontrolleri`'ne
+   upsert) tamamlandı, kullanıcı testi bekleniyor
 3. **Kişi Belgeleri** ✅ — `KisiBelgeleri` tablosu + `/kisibelgeleri`
    ekranı (kural tanımı: belge adı, kontrol kuralı, ziyaret sebebi
    uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
@@ -230,28 +234,25 @@ ayrı tablolarda (altta).
     `GecerliKontrol`, `GecerliMalzemeAlma`, `GecerliMalzemeBirakma`,
     `GecerliIskeleKurma` (bkz. Ziyaret Sebebi enum'u)
 
-### Belge Durumu — `KisiBelgeKontrolleri` / `AracBelgeKontrolleri` (⚠️ ŞEMASI DEĞİŞECEK, bkz. Sıradaki Adım)
+### Belge Durumu — `KisiBelgeKontrolleri` (uygulandı) / `AracBelgeKontrolleri` (⚠️ hâlâ eski şema, bkz. Sıradaki Adım)
 
-**2026-08-05 sonunda mevcut hâli (uygulanmış durum):** bunlar "gerçek
-kontrol olaylarının kaydı" (log) olarak tasarlandı — her `CekekTakip`
+**`KisiBelgeKontrolleri` (2026-08-06'da güncellendi):** artık log değil,
+kişiye bağlı **güncel durum** tablosu — bir kişi × bir belge kuralı = tek
+satır, upsert edilir. Alanlar: `KisiId` (zorunlu FK → `Kisiler`),
+`KisiBelgeId` (zorunlu FK → `KisiBelgeleri`), `CekekTakipId` (**opsiyonel**
+— yalnızca bir Çekek Takip girişinde teyit/güncelleme yapılırsa
+doldurulur, kayıt anında boş kalır), `AlindiSonucu` (bool),
+`GecerlilikTarihiSonucu` (nullable DateTime). `UNIQUE(KisiId,
+KisiBelgeId)` kısıtı var. Doldurma yeri: `/kisiler` ekranındaki "Belgeler"
+bölümü (bkz. Sıradaki Adım).
+
+**`AracBelgeKontrolleri` (henüz eski hâlde, DEĞİŞTİRİLECEK):** hâlâ
+"gerçek kontrol olaylarının kaydı" (log) tasarımında — her `CekekTakip`
 girişinde ilgili belgeler kontrol edildikçe yeni satır eklenir, üzerine
-yazılmaz (tekillik kısıtı yok). Alanlar: `CekekTakipId` (hangi giriş
-sırasında kontrol yapıldığı, zorunlu), `KisiBelgeId`/`AracBelgeId` (hangi
-kurala göre), `AlindiSonucu` (bool), `GecerlilikTarihiSonucu` (nullable
-DateTime).
-
-**Kullanıcıyla konuşulan yeni plan (henüz UYGULANMADI — sıradaki iş):**
-bu tasarım, "belge girişi sadece bir Çekek Takip girişi sırasında
-yapılabilir" varsayımına dayanıyordu. Ama asıl akış şu: belge girişi
-**Kişi/Araç Tanımları ekranlarında, kayıt anında** yapılmalı (henüz
-hiçbir CekekTakip yokken). Bu yüzden tablo, kişiye/araca bağlı **güncel
-durum** tutan bir tabloya dönüşecek:
-- `KisiId`/`AracId` eklenecek (zorunlu)
-- `CekekTakipId` **opsiyonel** hale gelecek (yalnızca bir girişte
-  teyit/güncelleme yapılırsa doldurulur)
-- `UNIQUE(KisiId, KisiBelgeId)` / `UNIQUE(AracId, AracBelgeId)` kısıtı
-  eklenecek (bir kişi/araç × bir belge kuralı = tek güncel satır, artık
-  log değil, upsert edilen durum)
+yazılmaz (tekillik kısıtı yok, `CekekTakipId` zorunlu, `AracId` yok).
+`KisiBelgeKontrolleri` ile aynı şekle (güncel durum, `AracId` zorunlu,
+`CekekTakipId` opsiyonel, `UNIQUE(AracId, AracBelgeId)`) çevrilecek —
+bkz. Sıradaki Adım madde 3.
 
 ### Çekek Takip — `CekekTakipleri` (uygulandı)
 

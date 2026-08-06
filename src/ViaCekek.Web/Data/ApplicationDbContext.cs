@@ -61,13 +61,25 @@ public class ApplicationDbContext(
             "CK_Araclar_YasaklanmaSebebi_Aktif",
             "[Aktif] = 1 AND [YasaklanmaSebebi] IS NULL OR [Aktif] = 0"));
 
-        // Log tabloları: aynı kişi/araç aynı belge kuralı için tekrar tekrar
-        // kontrol edilebilir, tekillik kısıtı yok — sadece sorgu için index.
+        // AracBelgeKontrolleri henüz log tablosu (bkz. CLAUDE.md > Sıradaki
+        // Adım): aynı araç aynı belge kuralı için tekrar tekrar kontrol
+        // edilebilir, tekillik kısıtı yok — sadece sorgu için index.
         builder.Entity<AracBelgeKontrol>()
             .HasIndex(abk => new { abk.CekekTakipId, abk.AracBelgeId });
 
+        // KisiBelgeKontrolleri artık kişiye bağlı GÜNCEL durum: bir kişi ×
+        // bir belge kuralı = tek satır (upsert edilir, log değil).
         builder.Entity<KisiBelgeKontrol>()
-            .HasIndex(kbk => new { kbk.CekekTakipId, kbk.KisiBelgeId });
+            .HasIndex(kbk => new { kbk.KisiId, kbk.KisiBelgeId })
+            .IsUnique();
+
+        // CekekTakip silinse bile kişinin güncel belge durumu kalır,
+        // yalnızca "hangi girişte teyit edildi" bağlantısı NULL'a düşer.
+        builder.Entity<KisiBelgeKontrol>()
+            .HasOne(kbk => kbk.CekekTakip)
+            .WithMany()
+            .HasForeignKey(kbk => kbk.CekekTakipId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Entity<CekekTakip>()
             .Property(c => c.ZiyaretSebebi)

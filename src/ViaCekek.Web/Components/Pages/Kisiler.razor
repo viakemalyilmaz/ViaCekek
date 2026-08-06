@@ -103,9 +103,56 @@
 
         <div>
             <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
-            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">İptal</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">@(duzenlenenKisi.Id == 0 ? "İptal" : "Kapat")</button>
         </div>
     </EditForm>
+}
+
+@if (formAcik && belgeDurumSatirlari is not null)
+{
+    <div class="card card-body mb-3">
+        <h5>Belgeler</h5>
+        @if (belgeDurumSatirlari.Count == 0)
+        {
+            <p class="text-muted">Aktif bir belge tanımı yok.</p>
+        }
+        else
+        {
+            @foreach (var satir in belgeDurumSatirlari)
+            {
+                <div class="row align-items-center mb-2">
+                    <div class="col-md-4">@satir.Belge.BelgeTanimi</div>
+                    <div class="col-md-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="belge-alindi-@satir.Belge.Id" @bind="satir.Alindi" />
+                            <label class="form-check-label" for="belge-alindi-@satir.Belge.Id">Alındı</label>
+                        </div>
+                    </div>
+                    @if (satir.Belge.GecerlilikTarihiKontrolu)
+                    {
+                        <div class="col-md-3">
+                            <input type="date" class="form-control" @bind="satir.GecerlilikTarihi" />
+                        </div>
+                        <div class="col-md-2">
+                            @if (satir.GecerlilikTarihi is not null && satir.GecerlilikTarihi.Value.Date < DateTime.Today)
+                            {
+                                <span class="badge bg-danger">Süresi geçmiş</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            <button class="btn btn-lg btn-success mt-2" @onclick="BelgeleriKaydet">Belgeleri Kaydet</button>
+        }
+        @if (belgeHataMesaji is not null)
+        {
+            <div class="alert alert-danger mt-2">@belgeHataMesaji</div>
+        }
+        @if (belgeBasariMesaji is not null)
+        {
+            <div class="alert alert-success mt-2">@belgeBasariMesaji</div>
+        }
+    </div>
 }
 
 @if (kisiler is null)
@@ -184,6 +231,17 @@ else
     private bool formAcik;
     private string? hataMesaji;
 
+    private List<BelgeDurumSatiri>? belgeDurumSatirlari;
+    private string? belgeHataMesaji;
+    private string? belgeBasariMesaji;
+
+    private sealed class BelgeDurumSatiri
+    {
+        public KisiBelge Belge { get; set; } = null!;
+        public bool Alindi { get; set; }
+        public DateTime? GecerlilikTarihi { get; set; }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await ListeyiYenile();
@@ -204,10 +262,13 @@ else
     {
         duzenlenenKisi = new Kisi { Aktif = true };
         hataMesaji = null;
+        belgeDurumSatirlari = null;
+        belgeHataMesaji = null;
+        belgeBasariMesaji = null;
         formAcik = true;
     }
 
-    private void DuzenlemeBaslat(Kisi kisi)
+    private async Task DuzenlemeBaslat(Kisi kisi)
     {
         duzenlenenKisi = new Kisi
         {
@@ -226,13 +287,85 @@ else
             KvkkOnayTarihi = kisi.KvkkOnayTarihi
         };
         hataMesaji = null;
+        belgeHataMesaji = null;
+        belgeBasariMesaji = null;
         formAcik = true;
+        await BelgeDurumlariniYukle(kisi.Id);
     }
 
     private void FormuKapat()
     {
         formAcik = false;
         hataMesaji = null;
+        belgeDurumSatirlari = null;
+    }
+
+    private async Task BelgeDurumlariniYukle(int kisiId)
+    {
+        var kurallar = await Db.KisiBelgeleri
+            .Where(b => b.Aktif)
+            .OrderBy(b => b.BelgeTanimi)
+            .ToListAsync();
+
+        var mevcutDurumlar = await Db.KisiBelgeKontrolleri
+            .Where(k => k.KisiId == kisiId)
+            .ToListAsync();
+
+        belgeDurumSatirlari = kurallar.Select(kural =>
+        {
+            var mevcut = mevcutDurumlar.FirstOrDefault(d => d.KisiBelgeId == kural.Id);
+            return new BelgeDurumSatiri
+            {
+                Belge = kural,
+                Alindi = mevcut?.AlindiSonucu ?? false,
+                GecerlilikTarihi = mevcut?.GecerlilikTarihiSonucu
+            };
+        }).ToList();
+    }
+
+    private async Task BelgeleriKaydet()
+    {
+        if (belgeDurumSatirlari is null)
+        {
+            return;
+        }
+
+        belgeHataMesaji = null;
+        belgeBasariMesaji = null;
+
+        try
+        {
+            foreach (var satir in belgeDurumSatirlari)
+            {
+                var mevcut = await Db.KisiBelgeKontrolleri
+                    .FirstOrDefaultAsync(k => k.KisiId == duzenlenenKisi.Id && k.KisiBelgeId == satir.Belge.Id);
+
+                var gecerlilikTarihi = satir.Belge.GecerlilikTarihiKontrolu ? satir.GecerlilikTarihi : null;
+
+                if (mevcut is null)
+                {
+                    Db.KisiBelgeKontrolleri.Add(new KisiBelgeKontrol
+                    {
+                        KisiId = duzenlenenKisi.Id,
+                        KisiBelgeId = satir.Belge.Id,
+                        AlindiSonucu = satir.Alindi,
+                        GecerlilikTarihiSonucu = gecerlilikTarihi
+                    });
+                }
+                else
+                {
+                    mevcut.AlindiSonucu = satir.Alindi;
+                    mevcut.GecerlilikTarihiSonucu = gecerlilikTarihi;
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            belgeBasariMesaji = "Belge durumları kaydedildi.";
+        }
+        catch (DbUpdateException)
+        {
+            belgeHataMesaji = "Belgeler kaydedilirken bir hata oluştu.";
+        }
     }
 
     private async Task Kaydet()
@@ -275,8 +408,8 @@ else
             }
 
             await Db.SaveChangesAsync();
-            formAcik = false;
             await ListeyiYenile();
+            await BelgeDurumlariniYukle(duzenlenenKisi.Id);
         }
         catch (DbUpdateException)
         {
