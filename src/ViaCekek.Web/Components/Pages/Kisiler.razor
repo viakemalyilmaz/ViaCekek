@@ -110,12 +110,12 @@
                     </td>
                     <td>
                         <div class="d-flex gap-2 flex-wrap">
+                            <input type="date" class="form-control" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayTarihi" />
                             <select class="form-select" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayDurumu">
                                 <option value="@KvkkOnayDurumu.Bilinmiyor">Bilinmiyor</option>
                                 <option value="@KvkkOnayDurumu.OnayVerildi">Onay Verildi</option>
                                 <option value="@KvkkOnayDurumu.OnayVerilmedi">Onay Verilmedi</option>
                             </select>
-                            <input type="date" class="form-control" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayTarihi" />
                         </div>
                     </td>
                 </tr>
