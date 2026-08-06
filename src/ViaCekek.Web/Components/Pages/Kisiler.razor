@@ -79,28 +79,6 @@
             </div>
         </fieldset>
 
-        <fieldset class="mb-3">
-            <legend class="form-label fs-6">KVKK</legend>
-            <div class="form-check mb-2">
-                <InputCheckbox class="form-check-input" @bind-Value="duzenlenenKisi.KvkkOnayFormuAlindi" id="kvkkAlindiCheck" />
-                <label class="form-check-label" for="kvkkAlindiCheck">Onay Formu Alındı</label>
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-2">
-                    <label class="form-label">Onay Durumu</label>
-                    <InputSelect class="form-select" @bind-Value="duzenlenenKisi.KvkkOnayDurumu">
-                        <option value="@KvkkOnayDurumu.Bilinmiyor">Bilinmiyor</option>
-                        <option value="@KvkkOnayDurumu.OnayVerildi">Onay Verildi</option>
-                        <option value="@KvkkOnayDurumu.OnayVerilmedi">Onay Verilmedi</option>
-                    </InputSelect>
-                </div>
-                <div class="col-md-6 mb-2">
-                    <label class="form-label">Onay Tarihi</label>
-                    <InputDate class="form-control" @bind-Value="duzenlenenKisi.KvkkOnayTarihi" />
-                </div>
-            </div>
-        </fieldset>
-
         <div>
             <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
             <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">@(duzenlenenKisi.Id == 0 ? "İptal" : "Kapat")</button>
@@ -112,38 +90,61 @@
 {
     <div class="card card-body mb-3">
         <h5>Belgeler</h5>
-        @if (belgeDurumSatirlari.Count == 0)
-        {
-            <p class="text-muted">Aktif bir belge tanımı yok.</p>
-        }
-        else
-        {
-            @foreach (var satir in belgeDurumSatirlari)
-            {
-                <div class="row align-items-center mb-2">
-                    <div class="col-md-4">@satir.Belge.BelgeTanimi</div>
-                    <div class="col-md-3">
+        <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Belge</th>
+                    <th>Alındı</th>
+                    <th>Detay</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>KVKK Onay Formu</td>
+                    <td>
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="belge-alindi-@satir.Belge.Id" @bind="satir.Alindi" />
-                            <label class="form-check-label" for="belge-alindi-@satir.Belge.Id">Alındı</label>
+                            <input class="form-check-input" type="checkbox" id="kvkkAlindiCheck" @bind="duzenlenenKisi.KvkkOnayFormuAlindi" />
+                            <label class="form-check-label" for="kvkkAlindiCheck">Alındı</label>
                         </div>
-                    </div>
-                    @if (satir.Belge.GecerlilikTarihiKontrolu)
-                    {
-                        <div class="col-md-3">
-                            <input type="date" class="form-control" @bind="satir.GecerlilikTarihi" />
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <select class="form-select" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayDurumu">
+                                <option value="@KvkkOnayDurumu.Bilinmiyor">Bilinmiyor</option>
+                                <option value="@KvkkOnayDurumu.OnayVerildi">Onay Verildi</option>
+                                <option value="@KvkkOnayDurumu.OnayVerilmedi">Onay Verilmedi</option>
+                            </select>
+                            <input type="date" class="form-control" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayTarihi" />
                         </div>
-                        <div class="col-md-2">
-                            @if (satir.GecerlilikTarihi is not null && satir.GecerlilikTarihi.Value.Date < DateTime.Today)
+                    </td>
+                </tr>
+                @foreach (var satir in belgeDurumSatirlari)
+                {
+                    <tr>
+                        <td>@satir.Belge.BelgeTanimi</td>
+                        <td>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="belge-alindi-@satir.Belge.Id" @bind="satir.Alindi" />
+                                <label class="form-check-label" for="belge-alindi-@satir.Belge.Id">Alındı</label>
+                            </div>
+                        </td>
+                        <td>
+                            @if (satir.Belge.GecerlilikTarihiKontrolu)
                             {
-                                <span class="badge bg-danger">Süresi geçmiş</span>
+                                <input type="date" class="form-control" style="width: auto; display: inline-block;" @bind="satir.GecerlilikTarihi" />
+                                @if (satir.GecerlilikTarihi is not null && satir.GecerlilikTarihi.Value.Date < DateTime.Today)
+                                {
+                                    <span class="badge bg-danger ms-2">Süresi geçmiş</span>
+                                }
                             }
-                        </div>
-                    }
-                </div>
-            }
-            <button class="btn btn-lg btn-success mt-2" @onclick="BelgeleriKaydet">Belgeleri Kaydet</button>
-        }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        </div>
+        <button class="btn btn-lg btn-success mt-2" @onclick="BelgeleriKaydet">Belgeleri Kaydet</button>
         @if (belgeHataMesaji is not null)
         {
             <div class="alert alert-danger mt-2">@belgeHataMesaji</div>
@@ -155,6 +156,8 @@
     </div>
 }
 
+@if (!formAcik)
+{
 @if (kisiler is null)
 {
     <p>Yükleniyor...</p>
@@ -222,6 +225,7 @@ else
         </tbody>
     </table>
     </div>
+}
 }
 
 @code {
@@ -335,6 +339,17 @@ else
 
         try
         {
+            var kisi = await Db.Kisiler.FindAsync(duzenlenenKisi.Id);
+            if (kisi is null)
+            {
+                belgeHataMesaji = "Kişi bulunamadı, sayfayı yenileyin.";
+                return;
+            }
+
+            kisi.KvkkOnayFormuAlindi = duzenlenenKisi.KvkkOnayFormuAlindi;
+            kisi.KvkkOnayDurumu = duzenlenenKisi.KvkkOnayDurumu;
+            kisi.KvkkOnayTarihi = duzenlenenKisi.KvkkOnayTarihi;
+
             foreach (var satir in belgeDurumSatirlari)
             {
                 var mevcut = await Db.KisiBelgeKontrolleri
