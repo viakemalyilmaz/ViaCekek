@@ -146,11 +146,46 @@ tek taraflı yapılmaz.
 - **Git commit/push** (2026-08-06'dan itibaren): her değişiklikten sonra
   otomatik commit/push yapılmaz — yalnızca kullanıcı açıkça isteyince.
 
-## Sıradaki Adım (2026-08-06 itibarıyla)
+## Sıradaki Adım (2026-08-07 itibarıyla)
 
 Tüm tanım/kural ekranları tamamlandı, tablet/dokunmatik uyumluluk
 iyileştirmeleri yapıldı (bkz. ilgili bölüm). Kişi ve Araç tarafında belge
-girişi de tamamlandı (madde 1-3 aşağıda ✅). Kalan işler:
+girişi de tamamlandı (madde 1-3 aşağıda ✅). Çekek Takip — Kişi Girişi
+(Aşama 1: Sorgu + Onay) tamamlandı ve commit'lendi (madde 4 ✅). Kalan
+işler, üzerinde anlaşılan sıraya göre (2026-08-07):
+
+- ⚠️ **Sırada: Kişi Girişi — Aşama 2** = Zamanlayıcı (Durum geçişleri:
+  `GirisYapildi` → `ZamanAsimi`, `BeklenenBitisZamani` kontrolü, "+15 dk"
+  uzatma) + **Board ekranı** (son giren üstte, süresi geçenler öncelikli
+  çıkar, satırda "Çıkış" butonu). Board tasarımı (hangi bilgiler
+  görünecek, buton davranışları) henüz konuşulmadı — kodlamaya
+  başlamadan önce netleştirilecek.
+- Sonra: **Araç Girişi**. Aynı `/cekektakip` sayfasına eklenecek (ayrı
+  bir ekran değil), board `CekekTakipleri` tablosundan geldiği için
+  Kişi/Araç girişleri board'da otomatik olarak birlikte görünecek.
+  **Akış 2026-08-07'de netleşti (henüz UYGULANMADI)**, kullanıcının
+  verdiği örnek kayıtla (Id=5 KisiId dolu, Id=6 aynı GirişTarihi/Saati +
+  aynı Ad Soyad/Firma/Telefon ile AracId dolu) doğrulandı:
+  - Üç senaryo mümkün: yalnızca kişi, yalnızca araç, **kişi + araç
+    birlikte** (aynı anda iki `CekekTakip` satırı oluşur).
+  - Aşama 1 (Sorgu)'a **Takip Numarası** alanı, Kimlik Numarası'nın
+    yanına eklenir — ikisi de opsiyonel, en az biri dolu olmalı.
+    Ziyaret Sebebi ortak.
+  - Kontrol: Kimlik No doluysa mevcut kişi zinciri; Takip No doluysa
+    **bağımsız paralel** bir araç zinciri çalışır — kayıtlı mı → yasaklı/
+    pasif mi → açık (çıkışsız) kaydı var mı → `AracTuru`'süne göre
+    filtrelenmiş `AracBelgeleri` eksik mi (KVKK benzeri özel durum yok,
+    ve kişiden farklı olarak **ziyaret sebebinden bağımsız**). İkisi de
+    girildiyse ikisi de geçmeli, biri başarısızsa hiçbiri kaydedilmez.
+  - Onay: tek form — Ad Soyad (kişi varsa salt okunur), Firma Adı/
+    Telefon (kişi varsa kişiden; yalnızca araç girişinde Araç'ın kendi
+    `FirmaAdi`'ndan varsayılan alınır, Telefon'un `Arac` modelinde
+    karşılığı yok — sadece o `CekekTakip` satırına bilgi amaçlı yazılır),
+    Tekne, Açıklama — ortak.
+  - Kaydet: Kimlik No girildiyse `KisiId` satırı, Takip No girildiyse
+    **ayrıca** `AracId` satırı oluşur; ikisi birlikteyse ikisi de aynı
+    GirişTarihi/Saati, Ziyaret Sebebi, Açıklama, Tekne'yi ve kişinin
+    (düzenlenmiş) Ad Soyad/Firma/Telefon'unu taşır.
 
 1. ✅ `KisiBelgeKontrolleri` şeması değişti: `KisiId` eklendi (zorunlu),
    `CekekTakipId` opsiyonel oldu, `UNIQUE(KisiId, KisiBelgeId)` eklendi
@@ -179,13 +214,17 @@ girişi de tamamlandı (madde 1-3 aşağıda ✅). Kalan işler:
    AracTuru filtre sorgusu gerçek DB'ye karşı ayrıca doğrulandı.
    "Belgeler" başlığı (Kişi ve Araç ekranlarında) kaldırıldı — tablonun
    "Belge" sütun başlığıyla zaten redundandı.
-4. ⚠️ Sırada: Çekek Takip ekranı (`/cekektakip`), **yalnızca Kişi girişi**
-   — akış 2026-08-07'de netleşti, bkz. İş Kuralları > Çekek Takip Akışı
-   — Kişi Girişi. Araç girişi akışı kişiden farklı olacak, ayrıca
-   konuşulup netleştirilecek (bu adımın kapsamında değil).
-5. Son olarak bir board/liste ekranı (son giren üstte, süresi dolanlar
-   öne çıkar) — süre kuralları netleşti (bkz. Zamanlayıcı bölümü),
-   görsel tasarım henüz konuşulmadı.
+4. ✅ Çekek Takip — Kişi Girişi (`/cekektakip`, Aşama 1: Sorgu + Onay)
+   tamamlandı, commit'lendi (2026-08-07, `4e75a87`). Kontrol sırası:
+   kayıtlı mı → yasaklı/pasif mi → açık (çıkışsız) kaydı var mı →
+   eksik/süresi geçmiş belge var mı (KVKK dahil) → Onay aşamasında
+   Ad Soyad salt okunur, Firma Adı/Telefon/Tekne/Açıklama düzenlenebilir,
+   Kaydet sonrası Firma/Telefon kişi kaydına da yazılır, form otomatik
+   sorgu ekranına döner. Okuma sorguları `AsNoTracking` kullanır (başka
+   sekmede yapılan güncellemelerin anında görülmesi için). Gerçek DB'ye
+   karşı scratch script'lerle uçtan uca doğrulandı.
+5. ⚠️ Sırada: **Kişi Girişi — Aşama 2** (Zamanlayıcı + Board) ve sonrasında
+   **Araç Girişi** — bkz. yukarıdaki "Sıradaki Adım" bölümü.
 
 ## Modüller (Geliştirme Sırası)
 

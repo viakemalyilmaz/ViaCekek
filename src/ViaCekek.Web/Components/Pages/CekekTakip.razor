@@ -20,11 +20,22 @@
 @if (asama == Asama.Sorgu)
 {
     <form @onsubmit="KontrolYap" class="card card-body mb-3">
-        <div class="mb-3">
+        <div class="mb-3" style="max-width: 400px;">
             <label class="form-label">Kimlik Numarası</label>
-            <input class="form-control form-control-lg" style="max-width: 400px;"
-                   @bind:get="kimlikNumarasi" @bind:set="v => kimlikNumarasi = v ?? string.Empty" @bind:event="oninput"
+            <input class="form-control form-control-lg"
+                   @bind:get="kimlikNumarasi" @bind:set="KimlikNumarasiDegisti" @bind:event="oninput"
                    autocomplete="off" autofocus />
+            @if (eslesenKisiler.Count > 0)
+            {
+                <div class="list-group mt-1">
+                    @foreach (var eslesen in eslesenKisiler)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => EslesenSec(eslesen)">
+                            <strong>@eslesen.KimlikNumarasi</strong> — @eslesen.AdSoyad
+                        </button>
+                    }
+                </div>
+            }
         </div>
 
         <div class="mb-3">
@@ -81,6 +92,18 @@
 else if (asama == Asama.Onay && bulunanKisi is not null)
 {
     <div class="card card-body mb-3">
+        @if (yaklasanBelgeler.Count > 0)
+        {
+            <div class="hatirlatma-kutusu mb-3">
+                <div>Bitiş tarihi yaklaşan belge(ler):</div>
+                <ul class="mb-0">
+                    @foreach (var belge in yaklasanBelgeler)
+                    {
+                        <li>@belge</li>
+                    }
+                </ul>
+            </div>
+        }
         <div class="row">
             <div class="col-md-4 mb-2">
                 <label class="form-label">Ad Soyad</label>
@@ -140,6 +163,7 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
 
     private Asama asama = Asama.Sorgu;
     private string kimlikNumarasi = string.Empty;
+    private List<Kisi> eslesenKisiler = [];
     private ZiyaretSebebi ziyaretSebebi = ZiyaretSebebi.Calisma;
 
     private string? engelMesaji;
@@ -152,6 +176,7 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
     private string? onayTelefon;
     private int? onayTekneId;
     private string? onayAciklama;
+    private List<string> yaklasanBelgeler = [];
 
     private List<Tekne> tekneler = [];
     private string? basariMesaji;
@@ -197,6 +222,26 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
         _ => null
     };
 
+    private async Task KimlikNumarasiDegisti(string? v)
+    {
+        kimlikNumarasi = v ?? string.Empty;
+
+        var arama = kimlikNumarasi.Trim();
+        eslesenKisiler = string.IsNullOrEmpty(arama)
+            ? []
+            : await Db.Kisiler.AsNoTracking()
+                .Where(k => k.KimlikNumarasi.Contains(arama))
+                .OrderBy(k => k.KimlikNumarasi)
+                .Take(5)
+                .ToListAsync();
+    }
+
+    private void EslesenSec(Kisi eslesen)
+    {
+        kimlikNumarasi = eslesen.KimlikNumarasi;
+        eslesenKisiler = [];
+    }
+
     private async Task KontrolYap()
     {
         basariMesaji = null;
@@ -205,6 +250,7 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
         eksikBelgeler = [];
         bulunanKisi = null;
         bulunanKisiId = null;
+        eslesenKisiler = [];
 
         var kimlik = kimlikNumarasi.Trim();
         if (string.IsNullOrWhiteSpace(kimlik))
@@ -269,6 +315,26 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
             eksikBelgeler = eksikler;
             return;
         }
+
+        var yaklasanlar = new List<string>();
+        foreach (var kural in uygulanabilirKurallar)
+        {
+            if (!kural.GecerlilikTarihiKontrolu)
+            {
+                continue;
+            }
+
+            var kontrol = kontroller.FirstOrDefault(k => k.KisiBelgeId == kural.Id);
+            if (kontrol?.GecerlilikTarihiSonucu is DateTime tarih)
+            {
+                var kalanGun = (tarih.Date - DateTime.Today).Days;
+                if (kalanGun is >= 0 and <= 10)
+                {
+                    yaklasanlar.Add($"{kural.BelgeTanimi} (bitiş: {tarih:dd.MM.yyyy}, {kalanGun} gün kaldı)");
+                }
+            }
+        }
+        yaklasanBelgeler = yaklasanlar;
 
         bulunanKisi = kisi;
         onayFirmaAdi = kisi.FirmaAdi;
@@ -338,9 +404,11 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
     {
         asama = Asama.Sorgu;
         kimlikNumarasi = string.Empty;
+        eslesenKisiler = [];
         bulunanKisi = null;
         bulunanKisiId = null;
         eksikBelgeler = [];
+        yaklasanBelgeler = [];
         engelMesaji = null;
         engelYonlendirmeGoster = false;
         hataMesaji = null;

@@ -101,3 +101,14 @@ h1:focus {
     min-height: 0;
     overflow: hidden;
 }
+
+/* Çekek Takip Aşama 2: bitiş tarihi yaklaşan (10 gün veya daha az)
+   belgeler için mat/soluk sarı hatırlatma — Bootstrap'ın parlak
+   alert-warning'inden bilerek farklı, "engel değil, dikkat" hissi verir. */
+.hatirlatma-kutusu {
+    background-color: #e8c874;
+    border: 1px solid #c9a227;
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    color: #4a3800;
+}
