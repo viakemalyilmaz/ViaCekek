@@ -1,0 +1,348 @@
+@page "/cekektakip"
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using ViaCekek.Web.Data
+@using ViaCekek.Web.Models
+@using ViaCekek.Web.Models.Common
+@inject ApplicationDbContext Db
+
+<PageTitle>Çekek Takip</PageTitle>
+
+<h3>Çekek Takip — Kişi Girişi</h3>
+
+@if (basariMesaji is not null)
+{
+    <div class="alert alert-success">@basariMesaji</div>
+}
+
+@if (asama == Asama.Sorgu)
+{
+    <form @onsubmit="KontrolYap" class="card card-body mb-3">
+        <div class="mb-3">
+            <label class="form-label">Kimlik Numarası</label>
+            <input class="form-control form-control-lg" style="max-width: 400px;"
+                   @bind:get="kimlikNumarasi" @bind:set="v => kimlikNumarasi = v ?? string.Empty" @bind:event="oninput"
+                   autocomplete="off" autofocus />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Ziyaret Sebebi</label>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var sebep in ziyaretSebepleri)
+                {
+                    <input type="radio" class="btn-check" name="ziyaretSebebi" id="zs-@sebep" autocomplete="off"
+                           checked="@(ziyaretSebebi == sebep)" @onchange="() => ziyaretSebebi = sebep" />
+                    <label class="btn btn-outline-success" for="zs-@sebep">@ZiyaretSebebiAdi(sebep)</label>
+                }
+            </div>
+        </div>
+
+        <div>
+            <button type="submit" class="btn btn-lg btn-primary">Kontrol</button>
+        </div>
+
+        @if (engelMesaji is not null)
+        {
+            <div class="alert alert-danger mt-3">
+                @engelMesaji
+                @if (engelYonlendirmeGoster)
+                {
+                    <div class="mt-2">
+                        @if (bulunanKisiId is int engelKisiId)
+                        {
+                            <a class="btn btn-outline-primary" href="@($"kisiler?duzenle={engelKisiId}")">Kişi Tanımları'na git</a>
+                        }
+                        else
+                        {
+                            <a class="btn btn-outline-primary" href="@($"kisiler?yeniKimlik={Uri.EscapeDataString(kimlikNumarasi.Trim())}")">+ Yeni Kişi ekle</a>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (eksikBelgeler.Count > 0)
+        {
+            <div class="alert alert-danger mt-3">
+                <div>Eksik/süresi geçmiş belge(ler):</div>
+                <ul class="mb-2">
+                    @foreach (var belge in eksikBelgeler)
+                    {
+                        <li>@belge</li>
+                    }
+                </ul>
+                <a class="btn btn-outline-primary" href="@($"kisiler?duzenle={bulunanKisiId}")">Kişi Tanımları'na git</a>
+            </div>
+        }
+    </form>
+}
+else if (asama == Asama.Onay && bulunanKisi is not null)
+{
+    <div class="card card-body mb-3">
+        <div class="row">
+            <div class="col-md-4 mb-2">
+                <label class="form-label">Ad Soyad</label>
+                <input class="form-control form-control-lg" value="@bulunanKisi.AdSoyad" disabled />
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label">Firma Adı</label>
+                <input class="form-control form-control-lg" @bind:get="onayFirmaAdi" @bind:set="v => onayFirmaAdi = MetinYardimci.BuyukHarf(v)" @bind:event="oninput" />
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label">Telefon</label>
+                <input class="form-control form-control-lg" @bind:get="onayTelefon" @bind:set="v => onayTelefon = v" @bind:event="oninput" placeholder="5XXXXXXXXX" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Tekne</label>
+            <select class="form-select form-select-lg" style="max-width: 400px;" @bind="onayTekneId">
+                <option value="">— Seçilmedi —</option>
+                @foreach (var tekne in tekneler)
+                {
+                    <option value="@tekne.Id">@tekne.TekneKodu — @tekne.TekneAdi</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Açıklama</label>
+            <textarea class="form-control" rows="2" maxlength="1000" @bind="onayAciklama"></textarea>
+        </div>
+
+        @if (hataMesaji is not null)
+        {
+            <div class="alert alert-danger">@hataMesaji</div>
+        }
+
+        <div>
+            <button type="button" class="btn btn-lg btn-success" @onclick="GirisKaydet">Giriş Kaydet</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="SorguyaDon">Vazgeç</button>
+        </div>
+    </div>
+}
+
+@code {
+    private enum Asama { Sorgu, Onay }
+
+    private static readonly ZiyaretSebebi[] ziyaretSebepleri =
+    [
+        ZiyaretSebebi.Calisma,
+        ZiyaretSebebi.Gorusme,
+        ZiyaretSebebi.Kesif,
+        ZiyaretSebebi.Kontrol,
+        ZiyaretSebebi.MalzemeAlma,
+        ZiyaretSebebi.MalzemeBirakma,
+        ZiyaretSebebi.IskeleKurma
+    ];
+
+    private Asama asama = Asama.Sorgu;
+    private string kimlikNumarasi = string.Empty;
+    private ZiyaretSebebi ziyaretSebebi = ZiyaretSebebi.Calisma;
+
+    private string? engelMesaji;
+    private bool engelYonlendirmeGoster;
+    private List<string> eksikBelgeler = [];
+
+    private Kisi? bulunanKisi;
+    private int? bulunanKisiId;
+    private string? onayFirmaAdi;
+    private string? onayTelefon;
+    private int? onayTekneId;
+    private string? onayAciklama;
+
+    private List<Tekne> tekneler = [];
+    private string? basariMesaji;
+    private string? hataMesaji;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tekneler = await Db.Tekneler.AsNoTracking().Where(t => t.Aktif).OrderBy(t => t.TekneKodu).ToListAsync();
+    }
+
+    private static string ZiyaretSebebiAdi(ZiyaretSebebi sebep) => sebep switch
+    {
+        ZiyaretSebebi.Calisma => "Çalışma",
+        ZiyaretSebebi.Gorusme => "Görüşme",
+        ZiyaretSebebi.Kesif => "Keşif",
+        ZiyaretSebebi.Kontrol => "Kontrol",
+        ZiyaretSebebi.MalzemeAlma => "Malzeme Alma",
+        ZiyaretSebebi.MalzemeBirakma => "Malzeme Bırakma",
+        ZiyaretSebebi.IskeleKurma => "İskele Kurma",
+        _ => sebep.ToString()
+    };
+
+    private static bool ZiyaretSebebineUygulanir(KisiBelge belge, ZiyaretSebebi sebep) => sebep switch
+    {
+        ZiyaretSebebi.Calisma => belge.GecerliCalisma,
+        ZiyaretSebebi.Gorusme => belge.GecerliGorusme,
+        ZiyaretSebebi.Kesif => belge.GecerliKesif,
+        ZiyaretSebebi.Kontrol => belge.GecerliKontrol,
+        ZiyaretSebebi.MalzemeAlma => belge.GecerliMalzemeAlma,
+        ZiyaretSebebi.MalzemeBirakma => belge.GecerliMalzemeBirakma,
+        ZiyaretSebebi.IskeleKurma => belge.GecerliIskeleKurma,
+        _ => false
+    };
+
+    // Ziyaret Sebebi'ne göre içeride kalma süresi — süresiz sebeplerde null
+    // (bkz. CLAUDE.md > Zamanlayıcı).
+    private static TimeSpan? SureLimiti(ZiyaretSebebi sebep) => sebep switch
+    {
+        ZiyaretSebebi.Kesif => TimeSpan.FromHours(1),
+        ZiyaretSebebi.Kontrol => TimeSpan.FromHours(1),
+        ZiyaretSebebi.MalzemeAlma => TimeSpan.FromMinutes(15),
+        ZiyaretSebebi.MalzemeBirakma => TimeSpan.FromMinutes(15),
+        _ => null
+    };
+
+    private async Task KontrolYap()
+    {
+        basariMesaji = null;
+        engelMesaji = null;
+        engelYonlendirmeGoster = false;
+        eksikBelgeler = [];
+        bulunanKisi = null;
+        bulunanKisiId = null;
+
+        var kimlik = kimlikNumarasi.Trim();
+        if (string.IsNullOrWhiteSpace(kimlik))
+        {
+            engelMesaji = "Kimlik numarası girin.";
+            return;
+        }
+
+        var kisi = await Db.Kisiler.AsNoTracking().FirstOrDefaultAsync(k => k.KimlikNumarasi == kimlik);
+        if (kisi is null)
+        {
+            engelMesaji = "Bu kimlik numarasıyla kayıtlı bir kişi bulunamadı.";
+            engelYonlendirmeGoster = true;
+            return;
+        }
+
+        bulunanKisiId = kisi.Id;
+
+        if (!kisi.Aktif)
+        {
+            engelMesaji = !string.IsNullOrEmpty(kisi.YasaklanmaSebebi)
+                ? $"Saha kontrolüne haber verilmeli, yasaklı kişi tespit edildi. (Sebep: {kisi.YasaklanmaSebebi})"
+                : "Bu kişi aktif değil.";
+            engelYonlendirmeGoster = true;
+            return;
+        }
+
+        var acikKaydiVarMi = await Db.CekekTakipleri.AnyAsync(c => c.KisiId == kisi.Id && c.CikisTarihi == null);
+        if (acikKaydiVarMi)
+        {
+            engelMesaji = "Bu kişinin sahada çıkışı yapılmamış açık bir kaydı var, tekrar giriş yapılamaz.";
+            return;
+        }
+
+        var kurallar = await Db.KisiBelgeleri.AsNoTracking().Where(b => b.Aktif).ToListAsync();
+        var uygulanabilirKurallar = kurallar.Where(b => ZiyaretSebebineUygulanir(b, ziyaretSebebi)).ToList();
+        var kontroller = await Db.KisiBelgeKontrolleri.AsNoTracking().Where(k => k.KisiId == kisi.Id).ToListAsync();
+
+        var eksikler = new List<string>();
+
+        if (!kisi.KvkkOnayFormuAlindi)
+        {
+            eksikler.Add("KVKK Onay Formu");
+        }
+
+        foreach (var kural in uygulanabilirKurallar)
+        {
+            var kontrol = kontroller.FirstOrDefault(k => k.KisiBelgeId == kural.Id);
+            if (kontrol is null || !kontrol.AlindiSonucu)
+            {
+                eksikler.Add(kural.BelgeTanimi);
+            }
+            else if (kural.GecerlilikTarihiKontrolu &&
+                     (kontrol.GecerlilikTarihiSonucu is null || kontrol.GecerlilikTarihiSonucu.Value.Date < DateTime.Today))
+            {
+                eksikler.Add($"{kural.BelgeTanimi} (süresi geçmiş)");
+            }
+        }
+
+        if (eksikler.Count > 0)
+        {
+            eksikBelgeler = eksikler;
+            return;
+        }
+
+        bulunanKisi = kisi;
+        onayFirmaAdi = kisi.FirmaAdi;
+        onayTelefon = kisi.Telefon;
+        onayTekneId = null;
+        onayAciklama = null;
+        asama = Asama.Onay;
+    }
+
+    private async Task GirisKaydet()
+    {
+        if (bulunanKisi is null)
+        {
+            return;
+        }
+
+        hataMesaji = null;
+
+        try
+        {
+            // bulunanKisi, KontrolYap'ta AsNoTracking ile okundu (başka
+            // sekmelerde yapılan güncellemeleri anında görebilmek için) —
+            // kaydetmeden önce izlenebilir (tracked) taze bir kopya çekilir.
+            var kisi = await Db.Kisiler.FindAsync(bulunanKisi.Id);
+            if (kisi is null)
+            {
+                hataMesaji = "Kişi bulunamadı, sayfayı yenileyin.";
+                return;
+            }
+
+            var simdi = DateTime.Now;
+            var sure = SureLimiti(ziyaretSebebi);
+
+            var giris = new ViaCekek.Web.Models.CekekTakip
+            {
+                KisiId = kisi.Id,
+                KimlikNumarasi = kisi.KimlikNumarasi,
+                AdSoyad = kisi.AdSoyad,
+                FirmaAdi = onayFirmaAdi,
+                Telefon = onayTelefon,
+                TekneId = onayTekneId,
+                GirisTarihi = DateOnly.FromDateTime(simdi),
+                GirisSaati = TimeOnly.FromDateTime(simdi),
+                ZiyaretSebebi = ziyaretSebebi,
+                Durum = CekekTakipDurumu.GirisYapildi,
+                BeklenenBitisZamani = sure is null ? null : simdi.Add(sure.Value),
+                Aciklama = onayAciklama
+            };
+
+            Db.CekekTakipleri.Add(giris);
+
+            kisi.FirmaAdi = onayFirmaAdi;
+            kisi.Telefon = onayTelefon;
+
+            await Db.SaveChangesAsync();
+
+            basariMesaji = $"{kisi.AdSoyad} için giriş kaydedildi.";
+            SorguyaDon();
+        }
+        catch (DbUpdateException)
+        {
+            hataMesaji = "Kayıt sırasında bir hata oluştu, tekrar deneyin.";
+        }
+    }
+
+    private void SorguyaDon()
+    {
+        asama = Asama.Sorgu;
+        kimlikNumarasi = string.Empty;
+        bulunanKisi = null;
+        bulunanKisiId = null;
+        eksikBelgeler = [];
+        engelMesaji = null;
+        engelYonlendirmeGoster = false;
+        hataMesaji = null;
+    }
+}

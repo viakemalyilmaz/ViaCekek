@@ -179,12 +179,13 @@ girişi de tamamlandı (madde 1-3 aşağıda ✅). Kalan işler:
    AracTuru filtre sorgusu gerçek DB'ye karşı ayrıca doğrulandı.
    "Belgeler" başlığı (Kişi ve Araç ekranlarında) kaldırıldı — tablonun
    "Belge" sütun başlığıyla zaten redundandı.
-4. Ancak bundan sonra Çekek Takip ekranını (`/cekektakip` gibi) kodlamaya
-   başla: kimlik/takip no sorgula → kayıt + güncel belge durumu tam mı
-   kontrol et → eksikse Kişi/Araç Tanımları'na yönlendir → tamamsa
-   tek adımda giriş/çıkış kaydı düş.
-5. Son olarak bir board/liste ekranı (son giren üstte) — tasarımı henüz
-   konuşulmadı, kullanıcıyla birlikte netleştirilecek.
+4. ⚠️ Sırada: Çekek Takip ekranı (`/cekektakip`), **yalnızca Kişi girişi**
+   — akış 2026-08-07'de netleşti, bkz. İş Kuralları > Çekek Takip Akışı
+   — Kişi Girişi. Araç girişi akışı kişiden farklı olacak, ayrıca
+   konuşulup netleştirilecek (bu adımın kapsamında değil).
+5. Son olarak bir board/liste ekranı (son giren üstte, süresi dolanlar
+   öne çıkar) — süre kuralları netleşti (bkz. Zamanlayıcı bölümü),
+   görsel tasarım henüz konuşulmadı.
 
 ## Modüller (Geliştirme Sırası)
 
@@ -323,46 +324,86 @@ Hem kişi hem araç giriş/çıkışları **tek tabloda** tutulur.
   ayrı kolonlar (`date`/`time`)
 - `ZiyaretSebebi` — sabit enum: Çalışma, Görüşme, Keşif, Kontrol,
   Malzeme Alma, Malzeme Bırakma, İskele Kurma
+- `Durum` — sabit enum (2026-08-07 eklendi): `GirisYapildi`,
+  `ZamanAsimi`, `CikisYapildi`, varsayılan `GirisYapildi`
+- `BeklenenBitisZamani` — nullable DateTime (2026-08-07 eklendi),
+  Ziyaret Sebebi'ne göre süre dolacağı an; süresiz sebeplerde null;
+  board'da öncelik sıralaması ve "+15 dk" uzatma için kullanılır
 - `Aciklama` — serbest metin
 
 ## İş Kuralları
 
-### Çekek Takip Akışı (2026-08-05'te netleşen güncel plan — henüz UYGULANMADI)
+### Çekek Takip Akışı — Kişi Girişi (2026-08-07'de netleşen plan — henüz UYGULANMADI)
 
-Amaç: kontrolden geçenlerin girişini, sahadan çıkanların çıkışını
-**hızlıca** kaydetmek. Bu ekranda hız çok önemli — belge girişi burada
-YAPILMAZ, sadece kontrol edilir.
+Amaç: kontrolden geçenlerin girişini **hızlıca** kaydetmek. Bu ekranda
+belge girişi YAPILMAZ, sadece kontrol edilir. **Tek sayfa** (`/cekektakip`),
+diğer tüm ekranlardaki liste↔form deseniyle aynı mantıkta **iki aşamalı**:
+Sorgu aşaması → Onay aşaması (ayrı bir route değil, aynı sayfada durum
+değişimiyle — sayfa yenilenmez, hız korunur).
 
-1. Kimlik/Takip numarası sorgulanır.
-2. **Kayıt yoksa** → doğrudan Kişi/Araç Tanımları (kayıt) ekranına
-   yönlendirilir; orada hem kişi/araç bilgisi hem de belge girişleri
-   yapılır. Belgeler tamamsa giriş aşamasına geçilir.
-3. **Kayıt var ama eksik/süresi geçmiş belge tespit edildiyse** → yine
-   Kişi/Araç Tanımları ekranına yönlendirilir, eksikler tamamlanır.
-4. **Belge geçmişi**: bir belge daha önce "Alındı" işaretlenmiş ve
-   geçerlilik tarihi hâlâ geçmemişse, tekrar sorulmaz — görevliye
-   otomatik "tamam" olarak gösterilir. Sadece süresi geçen veya hiç
-   girilmemiş belgeler için Kişi/Araç Tanımları'na yönlendirme tetiklenir.
-5. Her şey tamamsa tek adımda giriş/çıkış kaydı `CekekTakipleri`ye
-   düşülür (giriş tarihi/saati veya çıkış tarihi/saati, işlemi yapan
-   kullanıcı audit alanlarından).
-6. Kişi ve araç girişleri **aynı `CekekTakipleri` tablosunda**, ayrı
-   satırlar olarak tutulur (bkz. Veri Modeli).
-7. Ayrıca bir **board/liste ekranı** yapılacak: giriş sırasına göre, son
-   giren en üstte olacak şekilde güncel/son girişleri listeleyecek —
-   tasarımı henüz konuşulmadı, ayrı bir adım.
+**Aşama 1 — Sorgu**: Kimlik Numarası + Ziyaret Sebebi (radio) girilir,
+"Kontrol" butonuna basılır. Kontrol sırayla yapılır, ilk başarısız olan
+durdurur ve uyarı gösterir:
 
-Eski plan (referans, artık geçerli değil): önceden "belge kontrolü de
-Çekek Takip sırasında, her girişte yeniden yapılır" varsayılmıştı — bu
-kullanıcıyla konuşulup değiştirildi (yukarıdaki yeni akış geçerli).
+1. **Kişi kayıtlı mı?** Değilse → uyarı + "+ Yeni Kişi" ekranına
+   yönlendirme linki, giriş yapılmaz.
+2. **Yasaklı mı?** (Aktif=false VE Yasaklanma Sebebi dolu) → "Saha
+   kontrolüne haber verilmeli, yasaklı kişi tespit edildi" uyarısı
+   (en öncelikli/spesifik durum — bu kontrol "pasif mi" kontrolünden
+   önce yapılır, çünkü `YasaklanmaSebebi` yalnızca `Aktif=false` iken
+   dolu olabilir, aksi sırada hiç tetiklenmez), giriş yapılmaz.
+3. **Pasif mi?** (Aktif=false, Yasaklanma Sebebi boş) → genel "kişi
+   aktif değil" uyarısı, giriş yapılmaz.
+4. **Eksik/süresi geçmiş belge var mı?** `KisiBelgeleri` kurallarına göre
+   (aktif + ziyaret sebebine uygulanabilir olanlar) kontrol edilir. KVKK
+   da bir belge gibi ele alınır — tüm ziyaret sebeplerinde geçerli,
+   yalnızca `KvkkOnayFormuAlindi` bool'una bakılır (`KvkkOnayDurumu`/
+   `KvkkOnayTarihi` bu kapı kontrolünde kullanılmaz). Eksik/süresi geçmiş
+   varsa → hangileri olduğu uyarı olarak listelenir + "Kişi Tanımları"na
+   yönlendirme linki, giriş yapılmaz.
+5. Hepsi geçtiyse → Aşama 2'ye geçilir.
+
+**Aşama 2 — Onay**: 
+- **Ad Soyad**: salt okunur (Kişi kaydından), yalnızca `/kisiler`
+  ekranından değiştirilebilir.
+- **Firma Adı, Telefon**: düzenlenebilir — değişmiş olabilir. Kaydet'te
+  hem `CekekTakipleri`ye (o günkü anlık görüntü) hem de ilgili `Kisi`
+  kaydına yazılır (kişi kaydı da güncellenmiş olur).
+- **Tekne**: opsiyonel dropdown (`CekekTakip.TekneId`).
+- Kaydet → `CekekTakipleri`ye giriş satırı düşülür (GirişTarihi/
+  GirişSaati = şimdi, ZiyaretSebebi Aşama 1'den, snapshot alanları +
+  TekneId, işlemi yapan kullanıcı audit alanlarından), ardından
+  otomatik olarak Aşama 1'in boş sorgu ekranına dönülür (hızlı art arda
+  giriş için).
+
+**Çıkış**: Bu ekrandan değil, ayrı **board ekranından** (satırda bir
+"Çıkış" butonu ile) yapılacak.
+
+**Araç girişi**: Aynı `CekekTakipleri` tablosuna yazacak ama kontrol
+sırası/alanları kişiden **farklı olacak** — ayrıca konuşulup
+netleştirilecek, bu plan yalnızca KİŞİ tarafını kapsar.
+
+Eski planlar (referans, artık geçerli değil): "belge kontrolü de Çekek
+Takip sırasında her girişte yeniden yapılır" ve "tek aşamalı ekran,
+eksik belgede doğrudan Kişi Tanımları'na yönlendirilip geri dönülmez"
+varsayımları kullanıcıyla konuşulup yukarıdaki akışa değiştirildi.
 
 ### Zamanlayıcı / Otomatik Durum Güncelleme
-- Belirlenecek kurallara göre (örn. girişten 1 saat sonra durum
-  güncellenir, sonraki güncelleme 15 dakika sonra tekrar yapılır gibi)
-  `CekekTakipleri` kayıtlarının durumu arka planda otomatik güncellenir.
-- Bu kurallar parametrik olacak (sabit kod içine gömülmeyecek). Henüz
-  `CekekTakipleri`de bir "Durum" alanı yok — bu motor tasarlanırken
-  eklenecek.
+- **Süre kuralları netleşti (2026-08-07)**: Ziyaret Sebebi'ne göre
+  içeride kalma süresi — Çalışma/İskele Kurma/Görüşme = **süresiz**,
+  Keşif/Kontrol = **1 saat**, Malzeme Alma/Malzeme Bırakma = **15
+  dakika**. Süresi dolan kayıtlar board'da öncelik artırılarak en üste
+  çıkar; kullanıcı board üzerinden "+15 dk" uzatma verebilir.
+- **Şema eklendi (2026-08-07, migration uygulandı)**: `CekekTakipleri`ye
+  `Durum` (enum: `GirisYapildi`/`ZamanAsimi`/`CikisYapildi`, varsayılan
+  `GirisYapildi`) ve `BeklenenBitisZamani` (nullable DateTime, süresiz
+  sebeplerde null; giriş anında Ziyaret Sebebi'ne göre hesaplanıp
+  yazılır, "+15 dk" bu alanı ileri alır) eklendi. `GirisYapildi` →
+  `ZamanAsimi` geçişi **şimdilik gerçek bir arka plan servisiyle değil**,
+  board ekranı her açıldığında/yenilendiğinde süresi geçmiş kayıtları
+  güncelleyen hafif bir sorguyla yapılacak — tam zamanlayıcı
+  (`BackgroundService`) bu modülden ayrı, sonraki bir adımda ele
+  alınacak (bkz. Modüller > 7).
 
 ## Açık Konular / Netleştirilecekler
 
@@ -370,10 +411,10 @@ Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konula
 
 - **KVKK onayı nasıl alınacak**: Tablette imza/onay ekranı mı, yoksa
   fiziksel form mu, yoksa tek tık onay mı?
-- **Zamanlayıcı kuralları**: Durum güncelleme aralıkları (1 saat, 15 dk
-  gibi örnekler verildi) ve bu güncellemelerin ne anlama geldiği (uyarı mı,
-  otomatik çıkış mı, bildirim mi?) netleşmeli. `CekekTakipleri`de henüz
-  bir "Durum" alanı yok.
+- **Zamanlayıcı kuralları**: Süre kuralları ve `Durum`/`BeklenenBitisZamani`
+  alanları netleşti (bkz. Zamanlayıcı bölümü). Açık kalan: gerçek
+  `BackgroundService` (module 7) ne zaman kurulacak, süresi geçmenin
+  board dışında bir anlamı (bildirim, otomatik çıkış vb.) olacak mı?
 - **Raporlama ihtiyaçları**: Sahada kimler var, geçmiş giriş/çıkış
   raporları gibi ihtiyaçlar var mı, varsa kapsamı nedir?
 - **Araç–Kişi ilişkisi**: Bir aracın sahibi/kullanıcısı olan kişi nasıl

@@ -334,9 +334,29 @@ else
         public DateTime? GecerlilikTarihi { get; set; }
     }
 
+    [SupplyParameterFromQuery(Name = "duzenle")]
+    public int? SorguDuzenleId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "yeniKimlik")]
+    public string? SorguYeniKimlik { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         await ListeyiYenile();
+
+        if (SorguDuzenleId is int id)
+        {
+            var kisi = kisiler?.FirstOrDefault(k => k.Id == id);
+            if (kisi is not null)
+            {
+                await DuzenlemeBaslat(kisi);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(SorguYeniKimlik))
+        {
+            await YeniKisiBaslat();
+            duzenlenenKisi.KimlikNumarasi = SorguYeniKimlik;
+        }
     }
 
     private async Task ListeyiYenile()
@@ -522,10 +542,18 @@ else
                 ? $"Kaydedildi. Alındı işaretli olmadığı için şu belgelerin tarihi boş kaydedildi: {string.Join(", ", uyariBelgeleri)}."
                 : "Kaydedildi.";
 
-            // Yeni kayıt butonuna basılmış gibi ekran temizlenir — art arda
-            // hızlı veri girişine izin vermek için.
-            duzenlenenKisi = new Kisi { Aktif = true };
-            await BelgeDurumlariniYukle(null);
+            if (yeniKayit)
+            {
+                // Yeni kayıt butonuna basılmış gibi ekran temizlenir — art
+                // arda hızlı veri girişine izin vermek için.
+                duzenlenenKisi = new Kisi { Aktif = true };
+                await BelgeDurumlariniYukle(null);
+            }
+            else
+            {
+                // Düzenleme modunda aynı kayıt üzerinde kalınır.
+                await DuzenlemeBaslat(kisi);
+            }
             basariMesaji = mesaj;
         }
         catch (DbUpdateException)

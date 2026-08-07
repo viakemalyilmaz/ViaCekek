@@ -42,6 +42,14 @@ public class CekekTakip : AuditableEntity
 
     public ZiyaretSebebi ZiyaretSebebi { get; set; }
 
+    public CekekTakipDurumu Durum { get; set; } = CekekTakipDurumu.GirisYapildi;
+
+    // Ziyaret Sebebi'ne göre içeride kalma süresinin dolacağı an — süresiz
+    // sebeplerde (Çalışma/Görüşme/İskele Kurma) null kalır. "+15 dk" bu
+    // alanı ileri alır; board açıldığında süresi geçmiş ama hâlâ
+    // GirisYapildi olan kayıtlar ZamanAsimi'ye çevrilir.
+    public DateTime? BeklenenBitisZamani { get; set; }
+
     [MaxLength(1000)]
     public string? Aciklama { get; set; }
 }

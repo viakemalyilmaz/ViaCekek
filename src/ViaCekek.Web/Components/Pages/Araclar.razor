@@ -481,10 +481,18 @@ else
                 ? $"Kaydedildi. Alındı işaretli olmadığı için şu belgelerin tarihi boş kaydedildi: {string.Join(", ", uyariBelgeleri)}."
                 : "Kaydedildi.";
 
-            // Yeni kayıt butonuna basılmış gibi ekran temizlenir — art arda
-            // hızlı veri girişine izin vermek için.
-            duzenlenenArac = new Arac { Aktif = true };
-            await BelgeDurumlariniYukle(null, duzenlenenArac.AracTuru);
+            if (yeniKayit)
+            {
+                // Yeni kayıt butonuna basılmış gibi ekran temizlenir — art
+                // arda hızlı veri girişine izin vermek için.
+                duzenlenenArac = new Arac { Aktif = true };
+                await BelgeDurumlariniYukle(null, duzenlenenArac.AracTuru);
+            }
+            else
+            {
+                // Düzenleme modunda aynı kayıt üzerinde kalınır.
+                await DuzenlemeBaslat(arac);
+            }
             basariMesaji = mesaj;
         }
         catch (DbUpdateException)
