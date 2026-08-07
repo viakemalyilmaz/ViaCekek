@@ -57,6 +57,22 @@ tek taraflı yapılmaz.
   - `Data/Migrations/` — EF Core migration geçmişi
   - `Components/Pages/` — ekranlar (örn. `Tekneler.razor`), her biri
     `@attribute [Authorize]` + `@rendermode InteractiveServer`
+  - `Components/App.razor` — **DENENDİ VE GERİ ALINDI (2026-08-06)**:
+    `Home.razor`'da eksik olan `@rendermode InteractiveServer` yüzünden
+    navbar toggler'ın tıklamaya yanıt vermemesi sorunu için önce
+    `<HeadOutlet>`/`<Routes>`'a global `@rendermode="InteractiveServer"`
+    denendi — ama bu, IIS'e yayınlanınca Login sayfasında **sonsuz
+    yenileme döngüsüne** sebep oldu: Identity/Account bileşenleri
+    (`AccountLayout` vb.) cookie yazabilmek için `HttpContext`'e ihtiyaç
+    duyar ve bunun için **statik** render gerektirir; interaktif
+    circuit'te çalışırken statik moda zorla geri dönmeye çalışır, global
+    ayar da onu tekrar interaktif yapar → döngü. **Doğru çözüm**: global
+    ayar geri alındı (`App.razor`'da artık `@rendermode` yok), bunun
+    yerine yalnızca `Home.razor`'a diğer tüm sayfalardaki gibi sayfa
+    bazlı `@rendermode InteractiveServer` eklendi. **Ders**: yeni bir
+    sayfa eklenince `@rendermode InteractiveServer` eklemek unutulmamalı
+    — global kısayol Identity/Account statik render gereksinimiyle
+    çakışıyor, kullanılmamalı.
   - `Components/Layout/MainLayout.razor` — üst navigasyon çubuğu (yeni
     modül eklendikçe nav-link buraya eklenir), `LoginDisplay.razor` —
     giriş/çıkış durumu
@@ -71,16 +87,37 @@ tek taraflı yapılmaz.
   yayılır), büyütülmüş `.form-check-input` (checkbox) boyutu.
 - Tüm tablolar `<div class="table-responsive">` ile sarmalanır (dar
   tablet ekranında yatay taşma yerine kaydırma).
-- **Kullanım sıklığına göre önceliklendirme** (kullanıcıyla netleşti):
-  - Sık kullanılacaklar (öncelik): **Çekek Takip/board** (henüz
-    yapılmadı), **Kişiler**, **Araçlar** — bu ikisinde buton'lar
-    büyütüldü (`btn-lg` birincil aksiyonlarda, `btn-sm` yerine normal
-    boyut ikincil aksiyonlarda).
-  - Nadir kullanılacaklar (düşük öncelik, şimdilik sadece
-    `table-responsive` aldı, buton boyutları küçük kaldı): Tekneler,
-    Kullanıcılar, Kişi Belgeleri, Araç Belgeleri.
+- **Standart (2026-08-06'da tüm ekranlara yayıldı)**: önce sık
+  kullanılacak Kişiler/Araçlar'da uygulanan düzen, kullanıcı isteğiyle
+  **tüm tanım ekranlarına** (Tekneler, Kullanıcılar, Kişi Belgeleri, Araç
+  Belgeleri dahil) aynı standartta yayıldı:
+  - "+ Yeni X" ve Kaydet/Kapat butonları `btn-lg`; liste içindeki
+    ikincil aksiyonlar (Düzenle, Şifre Sıfırla vb.) `btn-sm` değil
+    normal boyut.
+  - Form (yeni kayıt/düzenleme) açıkken alttaki liste **gizlenir**
+    (`@if (!formAcik) { ... }`), sadece form kapalıyken gösterilir —
+    kayıt/düzeltme ekranı gereksiz kalabalık olmadan tek işe odaklanır.
+  - Formu kapatma butonu her durumda (yeni kayıt veya düzenleme) **"Kapat"**
+    yazar — önceden yeni kayıtta "İptal" gösteriliyordu, 2026-08-06'da
+    kullanıcı isteğiyle tüm ekranlarda tek bir metne (Kapat) sabitlendi.
+    
+- **Kişiler ve Araçlar formu kaydırma alanı (2026-08-07)**: form açıkken
+  Kaydet/Kapat butonları ve kayıt sonucu bilgi/uyarı mesajı kaydırma
+  alanının dışında, daima üstte kalır. Dikey scrollbar bu araç çubuğunun
+  altındaki karttan başlar; yalnızca form alanları ve belge tablosu
+  kaydırılır (`form-scroll-layout` + `form-scroll-content`). Aynı davranış `/kisiler` ve `/araclar` formlarına uygulanmıştır.
 - Çekek Takip ekranı yapılırken bu prensipler baştan uygulanmalı: büyük
-  dokunmatik butonlar, büyük yazı tipi, minimum tıklama.
+  dokunmatik butonlar, büyük yazı tipi, minimum tıklama, form açıkken
+  liste/board gizli.
+- **Üst navigasyon (2026-08-06'da düzeltildi)**: `navbar-expand` (breakpoint'siz)
+  dar ekranda linklerin üst üste kırılmasına sebep oluyordu. `MainLayout.razor`
+  artık `navbar-expand-lg` + gerçek bir daraltılabilir (hamburger) menü
+  kullanıyor. Menü, Bootstrap JS veya Blazor event/state gerektirmeyen
+  `<input type="checkbox">` + ilişkili `<label>` ve
+  `.navbar-toggle-checkbox:checked ~ .navbar-collapse` CSS seçicisiyle
+  açılıp kapanıyor; bu nedenle statik render edilen Identity/Account
+  sayfalarında da çalışıyor. Menü sırası: Kişiler, Araçlar,
+  Tekneler, Kişi Belgeleri, Araç Belgeleri, (Yönetici-only) Kullanıcılar.
 
 ## Ortak Kurallar (Tüm Tablolar İçin)
 
@@ -106,30 +143,42 @@ tek taraflı yapılmaz.
   temiz geçince kullanıcıya haber verilir, kullanıcı tarayıcıda kendisi
   test eder, onay sonrası sıradaki modüle geçilir. Birden fazla ekran
   arka arkaya, teste açılmadan inşa edilmez.
+- **Git commit/push** (2026-08-06'dan itibaren): her değişiklikten sonra
+  otomatik commit/push yapılmaz — yalnızca kullanıcı açıkça isteyince.
 
 ## Sıradaki Adım (2026-08-06 itibarıyla)
 
 Tüm tanım/kural ekranları tamamlandı, tablet/dokunmatik uyumluluk
-iyileştirmeleri yapıldı (bkz. ilgili bölüm). Kişi tarafında belge girişi
-de tamamlandı (madde 1-2 aşağıda ✅). Kalan işler:
+iyileştirmeleri yapıldı (bkz. ilgili bölüm). Kişi ve Araç tarafında belge
+girişi de tamamlandı (madde 1-3 aşağıda ✅). Kalan işler:
 
 1. ✅ `KisiBelgeKontrolleri` şeması değişti: `KisiId` eklendi (zorunlu),
    `CekekTakipId` opsiyonel oldu, `UNIQUE(KisiId, KisiBelgeId)` eklendi
    — artık log değil, kişiye bağlı güncel durum tablosu. Migration
    uygulandı, gerçek DB'ye karşı (upsert + unique constraint + cascade
    delete) doğrulandı.
-2. ✅ `/kisiler` ekranına belge girişi eklendi: bir kişi kaydedilince
-   (yeni veya düzenleme) form kapanmıyor, altında aktif `KisiBelgeleri`
-   kurallarının tümü (ziyaret sebebiyle filtrelenmiyor, çünkü henüz bir
-   ziyaret yok) Alındı checkbox + varsa Geçerlilik Tarihi ile listeleniyor,
-   ayrı bir "Belgeleri Kaydet" butonuyla `KisiBelgeKontrolleri`ne
-   upsert ediliyor.
-3. **Sırada**: `AracBelgeKontrolleri` için aynı şema değişikliği
-   (`AracId` ekle, `CekekTakipId`'yi opsiyonel yap, `UNIQUE(AracId,
-   AracBelgeId)` ekle), sonra `/araclar` ekranına aynı belge girişi
-   bölümünü ekle — ama `AracBelgeleri` kuralları o aracın kendi
+2. ✅ `/kisiler` ekranına belge girişi eklendi: form açılınca (yeni veya
+   düzenleme) aktif `KisiBelgeleri` kurallarının tümü (ziyaret sebebiyle
+   filtrelenmiyor, çünkü henüz bir ziyaret yok) Alındı checkbox + varsa
+   Geçerlilik Tarihi ile, KVKK ilk satır olacak şekilde aynı tabloda
+   listeleniyor. **Tek "Kaydet" butonu** kişi bilgilerini + belge
+   durumlarını + KVKK'yı aynı `SaveChangesAsync` çağrısında kaydediyor
+   (2026-08-06'da iki ayrı buton — "Kaydet" ve "Belgeleri Kaydet" — tek
+   butona birleştirildi). Yeni kişi için EF Core'un navigation-based
+   ilişki eşleştirmesi kullanılıyor (`KisiBelgeKontrol.Kisi = kisi`),
+   çünkü kişinin Id'si SaveChanges'ten önce bilinmiyor — bu davranış
+   gerçek DB'ye karşı ayrıca doğrulandı.
+3. ✅ `AracBelgeKontrolleri` için aynı şema değişikliği (`AracId` eklendi,
+   `CekekTakipId` opsiyonel oldu, `UNIQUE(AracId, AracBelgeId)` eklendi),
+   `/araclar` ekranına aynı belge girişi bölümü **tek Kaydet butonuyla**
+   eklendi. Kişi'den fark: `AracBelgeleri` kuralları o aracın kendi
    `AracTuru`süne göre (`GecerliArac`/`GecerliVinc`/...) otomatik
-   filtrelenerek gösterilecek (Kişi'de olduğu gibi tüm kurallar değil).
+   filtreleniyor (tüm kurallar değil) — Araç Türü dropdown'u değişince
+   liste `@bind-Value:after` ile yeniden yükleniyor. Navigation-fixup
+   davranışı (yeni araç + belgeleri tek `SaveChangesAsync`'te) ve
+   AracTuru filtre sorgusu gerçek DB'ye karşı ayrıca doğrulandı.
+   "Belgeler" başlığı (Kişi ve Araç ekranlarında) kaldırıldı — tablonun
+   "Belge" sütun başlığıyla zaten redundandı.
 4. Ancak bundan sonra Çekek Takip ekranını (`/cekektakip` gibi) kodlamaya
    başla: kimlik/takip no sorgula → kayıt + güncel belge durumu tam mı
    kontrol et → eksikse Kişi/Araç Tanımları'na yönlendir → tamamsa
@@ -149,14 +198,17 @@ Belgeleri yapıldı — Araç ve Araç Belgeleri ekranları sonraki adımlar.
    (liste + ekle/düzenle) tamamlandı, kullanıcı testi bekleniyor
 2. **Kişi Tanımları** ✅ — `Kisiler` tablosu + `/kisiler` ekranı (liste +
    ekle/düzenle, Firma Adı autocomplete, koşullu Yasaklanma Sebebi alanı,
-   kayıt sonrası belge girişi bölümü — `KisiBelgeKontrolleri`'ne
-   upsert) tamamlandı, kullanıcı testi bekleniyor
+   belge girişi bölümü — tek "Kaydet" ile kişi + belgeler + KVKK aynı
+   anda `KisiBelgeKontrolleri`'ne upsert) tamamlandı, kullanıcı testi
+   bekleniyor
 3. **Kişi Belgeleri** ✅ — `KisiBelgeleri` tablosu + `/kisibelgeleri`
    ekranı (kural tanımı: belge adı, kontrol kuralı, ziyaret sebebi
    uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
 4. **Araç Tanımları** ✅ — `Araclar` tablosu + `/araclar` ekranı (liste +
    ekle/düzenle, Araç Türü seçimi, Firma Adı autocomplete, koşullu
-   Yasaklanma Sebebi) tamamlandı, kullanıcı testi bekleniyor
+   Yasaklanma Sebebi, araç türüne göre filtrelenmiş belge girişi bölümü
+   — tek "Kaydet" ile araç + belgeler aynı anda `AracBelgeKontrolleri`'ne
+   upsert) tamamlandı, kullanıcı testi bekleniyor
 5. **Araç Belgeleri** ✅ — `AracBelgeleri` tablosu + `/aracbelgeleri`
    ekranı (kural tanımı: belge adı, kontrol kuralı, araç türü
    uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
@@ -234,25 +286,27 @@ ayrı tablolarda (altta).
     `GecerliKontrol`, `GecerliMalzemeAlma`, `GecerliMalzemeBirakma`,
     `GecerliIskeleKurma` (bkz. Ziyaret Sebebi enum'u)
 
-### Belge Durumu — `KisiBelgeKontrolleri` (uygulandı) / `AracBelgeKontrolleri` (⚠️ hâlâ eski şema, bkz. Sıradaki Adım)
+### Belge Durumu — `KisiBelgeKontrolleri` / `AracBelgeKontrolleri` (ikisi de uygulandı, 2026-08-06)
 
-**`KisiBelgeKontrolleri` (2026-08-06'da güncellendi):** artık log değil,
-kişiye bağlı **güncel durum** tablosu — bir kişi × bir belge kuralı = tek
-satır, upsert edilir. Alanlar: `KisiId` (zorunlu FK → `Kisiler`),
-`KisiBelgeId` (zorunlu FK → `KisiBelgeleri`), `CekekTakipId` (**opsiyonel**
-— yalnızca bir Çekek Takip girişinde teyit/güncelleme yapılırsa
-doldurulur, kayıt anında boş kalır), `AlindiSonucu` (bool),
-`GecerlilikTarihiSonucu` (nullable DateTime). `UNIQUE(KisiId,
-KisiBelgeId)` kısıtı var. Doldurma yeri: `/kisiler` ekranındaki "Belgeler"
-bölümü (bkz. Sıradaki Adım).
+İkisi de artık log değil, kişiye/araca bağlı **güncel durum** tablosu —
+bir kişi/araç × bir belge kuralı = tek satır, upsert edilir. Alanlar:
+`KisiId`/`AracId` (zorunlu FK), `KisiBelgeId`/`AracBelgeId` (zorunlu FK),
+`CekekTakipId` (**opsiyonel** — yalnızca bir Çekek Takip girişinde
+teyit/güncelleme yapılırsa doldurulur, kayıt anında boş kalır),
+`AlindiSonucu` (bool), `GecerlilikTarihiSonucu` (nullable DateTime).
+`UNIQUE(KisiId, KisiBelgeId)` / `UNIQUE(AracId, AracBelgeId)` kısıtı var.
+Doldurma yeri: `/kisiler` ve `/araclar` ekranlarındaki belge tablosu
+(başlıksız — tablonun "Belge" sütunu yeterli, ayrı "Belgeler" etiketi
+2026-08-06'da kaldırıldı). Yeni kayıt + belgelerin aynı `SaveChangesAsync`
+çağrısında kaydedilmesi EF Core'un navigation-based ilişki eşleştirmesiyle
+çözüldü (`KisiBelgeKontrol.Kisi = kisi` / `AracBelgeKontrol.Arac = arac`).
 
-**`AracBelgeKontrolleri` (henüz eski hâlde, DEĞİŞTİRİLECEK):** hâlâ
-"gerçek kontrol olaylarının kaydı" (log) tasarımında — her `CekekTakip`
-girişinde ilgili belgeler kontrol edildikçe yeni satır eklenir, üzerine
-yazılmaz (tekillik kısıtı yok, `CekekTakipId` zorunlu, `AracId` yok).
-`KisiBelgeKontrolleri` ile aynı şekle (güncel durum, `AracId` zorunlu,
-`CekekTakipId` opsiyonel, `UNIQUE(AracId, AracBelgeId)`) çevrilecek —
-bkz. Sıradaki Adım madde 3.
+**Kural (2026-08-06):** Geçerlilik Tarihi alanı, Alındı işaretli değilken
+UI'da devre dışı (`disabled`). Kaydet anında, Alındı işaretsizken hâlâ bir
+tarih varsa (örn. önce girilip sonra Alındı kaldırılmışsa) tarih otomatik
+`null`'a çevrilir ve kullanıcıya hangi belge(ler) için bunun yapıldığını
+söyleyen bir uyarı (`alert-warning`) gösterilir — kayıt engellenmez, sadece
+uyarılır. Aynı kural KVKK Onay Tarihi için de geçerli.
 
 ### Çekek Takip — `CekekTakipleri` (uygulandı)
 
@@ -347,8 +401,18 @@ Kullanıcı rolleri → 3 sabit rol ile netleşti (bkz. Kullanıcı Yönetimi).
   onun yerine `/kullanicilar` ekranındaki "Yeni Kullanıcı" formu
   kullanılır (yöneticinin oturumunu bozmadan `UserManager.CreateAsync` +
   `AddToRoleAsync` ile doğrudan hesap açar).
-- `/kullanicilar` (Yönetici-only): kullanıcı listesi + rol, yeni kullanıcı
-  oluşturma, mevcut kullanıcının rolünü değiştirme.
+- `/kullanicilar` (Yönetici-only): kullanıcı listesi (E-posta, Rol,
+  Durum) + tek bir form hem **yeni kullanıcı oluşturma** hem **düzenleme**
+  için kullanılır (diğer ekranlarla aynı desen): "Düzenle" butonu formu
+  o kullanıcının Email'i (salt okunur), Rol ve Aktif değerleriyle açar.
+  **Aktif/Pasif** (2026-08-06) şema değişikliği gerektirmeden ASP.NET
+  Core Identity'nin hazır lockout mekanizmasıyla uygulandı:
+  `UserManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue)` →
+  Pasif (giriş engellenir, `SignInManager` zaten `IsLockedOut`u kontrol
+  edip `LockedOut` sonucu döner), `SetLockoutEndDateAsync(user, null)` →
+  Aktif. Liste ekranında "Aktif" durumu `LockoutEnd is null ||
+  LockoutEnd <= UtcNow` ile hesaplanır. Şifre Sıfırla ayrı bir aksiyon
+  olarak kaldı (Kaydet formunun bir parçası değil).
 - `Routes.razor`: yetkisiz ama zaten giriş yapmış bir kullanıcı artık
   login sayfasına döngüye girmiyor, "Bu sayfaya erişim yetkiniz yok"
   mesajı görüyor.

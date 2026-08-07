@@ -16,3 +16,41 @@
         right: 0.75rem;
         top: 0.5rem;
     }
+
+.navbar-toggle-checkbox {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+@media (max-width: 991.98px) {
+    .navbar-toggle-checkbox:checked ~ .navbar-collapse {
+        display: block;
+    }
+}
+
+
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+}
+
+.app-shell > .navbar {
+    flex: 0 0 auto;
+}
+
+.app-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.app-page-content {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}

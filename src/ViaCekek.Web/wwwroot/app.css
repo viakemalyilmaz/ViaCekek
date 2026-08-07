@@ -47,3 +47,57 @@ h1:focus {
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
 }
+
+/* Uzun formlarda (Kişiler, Araçlar) Kaydet/Kapat butonları ve
+   kayıt sonucu mesajı, kaydırma sırasında hep görünür kalsın diye
+   üstte sabitlenir — bkz. CLAUDE.md > Tablet/Dokunmatik Uyumluluk. */
+.form-sticky-actions {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #fff;
+    border-bottom: 2px solid #dee2e6;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+
+/* Kişiler ve Araçlar formlarında aksiyon/mesaj alanı sabit kalır;
+   yalnızca altındaki form içeriği kendi alanı içinde dikey kayar. */
+.form-scroll-layout {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    width: 100%;
+}
+
+.form-scroll-layout > .form-sticky-actions {
+    position: static;
+}
+
+.form-scroll-content {
+    min-height: 0;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+
+.kisiler-page.form-open,
+.araclar-page.form-open {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.kisiler-page.form-open .form-scroll-layout,
+.araclar-page.form-open .form-scroll-layout {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}

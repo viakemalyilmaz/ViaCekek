@@ -16,7 +16,7 @@
     <div class="alert alert-danger">@hataMesaji</div>
 }
 
-<button class="btn btn-primary mb-3" @onclick="YeniTekneBaslat">+ Yeni Tekne</button>
+<button class="btn btn-lg btn-primary mb-3" @onclick="YeniTekneBaslat">+ Yeni Tekne</button>
 
 @if (formAcik)
 {
@@ -38,12 +38,14 @@
         </div>
 
         <div>
-            <button type="submit" class="btn btn-success">Kaydet</button>
-            <button type="button" class="btn btn-secondary" @onclick="FormuKapat">İptal</button>
+            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">Kapat</button>
         </div>
     </EditForm>
 }
 
+@if (!formAcik)
+{
 @if (tekneler is null)
 {
     <p>Yükleniyor...</p>
@@ -54,18 +56,28 @@ else if (tekneler.Count == 0)
 }
 else
 {
+    <div class="mb-3">
+        <input type="search" class="form-control" style="max-width: 400px;" placeholder="Ara (tekne kodu, tekne adı)..." @bind="aramaMetni" @bind:event="oninput" />
+    </div>
+
+    @if (!GorunenTekneler.Any())
+    {
+        <p>Aramanızla eşleşen kayıt bulunamadı.</p>
+    }
+    else
+    {
     <div class="table-responsive">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
-                <th>Tekne Kodu</th>
-                <th>Tekne Adı</th>
-                <th>Durum</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("TekneKodu")'>Tekne Kodu @SiralamaIsareti("TekneKodu")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("TekneAdi")'>Tekne Adı @SiralamaIsareti("TekneAdi")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("Durum")'>Durum @SiralamaIsareti("Durum")</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var tekne in tekneler)
+            @foreach (var tekne in GorunenTekneler)
             {
                 <tr>
                     <td>@tekne.TekneKodu</td>
@@ -81,13 +93,15 @@ else
                         }
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => DuzenlemeBaslat(tekne)">Düzenle</button>
+                        <button class="btn btn-outline-primary" @onclick="() => DuzenlemeBaslat(tekne)">Düzenle</button>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
     </div>
+    }
+}
 }
 
 @code {
@@ -95,6 +109,50 @@ else
     private Tekne duzenlenenTekne = new();
     private bool formAcik;
     private string? hataMesaji;
+
+    private string aramaMetni = string.Empty;
+    private string siralamaAlani = "TekneKodu";
+    private bool siralamaArtan = true;
+
+    private IEnumerable<Tekne> GorunenTekneler
+    {
+        get
+        {
+            IEnumerable<Tekne> sonuc = tekneler ?? [];
+
+            if (!string.IsNullOrWhiteSpace(aramaMetni))
+            {
+                var arama = aramaMetni.Trim();
+                sonuc = sonuc.Where(t =>
+                    (t.TekneKodu?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.TekneAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            sonuc = siralamaAlani switch
+            {
+                "TekneAdi" => siralamaArtan ? sonuc.OrderBy(t => t.TekneAdi) : sonuc.OrderByDescending(t => t.TekneAdi),
+                "Durum" => siralamaArtan ? sonuc.OrderBy(t => t.Aktif) : sonuc.OrderByDescending(t => t.Aktif),
+                _ => siralamaArtan ? sonuc.OrderBy(t => t.TekneKodu) : sonuc.OrderByDescending(t => t.TekneKodu),
+            };
+
+            return sonuc;
+        }
+    }
+
+    private void SiralamayiDegistir(string alan)
+    {
+        if (siralamaAlani == alan)
+        {
+            siralamaArtan = !siralamaArtan;
+        }
+        else
+        {
+            siralamaAlani = alan;
+            siralamaArtan = true;
+        }
+    }
+
+    private string SiralamaIsareti(string alan) => siralamaAlani != alan ? "" : (siralamaArtan ? "▲" : "▼");
 
     protected override async Task OnInitializedAsync()
     {

@@ -20,7 +20,7 @@
     <div class="alert alert-danger">@hataMesaji</div>
 }
 
-<button class="btn btn-primary mb-3" @onclick="YeniBelgeBaslat">+ Yeni Belge</button>
+<button class="btn btn-lg btn-primary mb-3" @onclick="YeniBelgeBaslat">+ Yeni Belge</button>
 
 @if (formAcik)
 {
@@ -75,12 +75,14 @@
         </fieldset>
 
         <div>
-            <button type="submit" class="btn btn-success">Kaydet</button>
-            <button type="button" class="btn btn-secondary" @onclick="FormuKapat">İptal</button>
+            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">Kapat</button>
         </div>
     </EditForm>
 }
 
+@if (!formAcik)
+{
 @if (belgeler is null)
 {
     <p>Yükleniyor...</p>
@@ -134,13 +136,14 @@ else
                         }
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => DuzenlemeBaslat(belge)">Düzenle</button>
+                        <button class="btn btn-outline-primary" @onclick="() => DuzenlemeBaslat(belge)">Düzenle</button>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
     </div>
+}
 }
 
 @code {

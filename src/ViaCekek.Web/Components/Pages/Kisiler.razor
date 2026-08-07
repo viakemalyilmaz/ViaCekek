@@ -9,6 +9,8 @@
 
 <PageTitle>Kişi Tanımları</PageTitle>
 
+<div class="kisiler-page @(formAcik ? "form-open" : null)">
+
 <h3>Kişi Tanımları</h3>
 
 @if (hataMesaji is not null)
@@ -16,18 +18,49 @@
     <div class="alert alert-danger">@hataMesaji</div>
 }
 
-<button class="btn btn-lg btn-primary mb-3" @onclick="YeniKisiBaslat">+ Yeni Kişi</button>
+@if (!formAcik)
+{
+    <button class="btn btn-lg btn-primary mb-3" @onclick="YeniKisiBaslat">+ Yeni Kişi</button>
+}
 
 @if (formAcik)
 {
-    <EditForm Model="duzenlenenKisi" OnValidSubmit="Kaydet" class="card card-body mb-3">
+    <EditForm Model="duzenlenenKisi" OnValidSubmit="Kaydet" class="form-scroll-layout">
         <DataAnnotationsValidator />
+
+        <div class="form-sticky-actions">
+            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">Kapat</button>
+            @if (basariMesaji is not null)
+            {
+                <div class="alert @(basariUyariMi ? "alert-warning" : "alert-success") mt-2 mb-0">@basariMesaji</div>
+            }
+        </div>
+
+        <div class="form-scroll-content">
+            <div class="card card-body">
         <ValidationSummary />
 
         <div class="row">
             <div class="col-md-4 mb-2">
                 <label class="form-label">Kimlik Numarası</label>
-                <InputText class="form-control" @bind-Value="duzenlenenKisi.KimlikNumarasi" />
+                <input class="form-control" @bind="duzenlenenKisi.KimlikNumarasi" @bind:event="oninput" autocomplete="off" />
+                @if (duzenlenenKisi.Id == 0 && EslesenKisiler.Count > 0)
+                {
+                    <div class="list-group mt-1">
+                        @foreach (var eslesen in EslesenKisiler)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => DuzenlemeBaslat(eslesen)">
+                                <strong>@eslesen.KimlikNumarasi</strong> — @eslesen.AdSoyad
+                                @if (!eslesen.Aktif)
+                                {
+                                    <span class="badge bg-secondary ms-1">Pasif</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                    <div class="form-text">Bu kimlik numarasıyla kayıt zaten var — üzerine tıklayarak düzenleyebilirsin.</div>
+                }
             </div>
             <div class="col-md-4 mb-2">
                 <label class="form-label">Ad Soyad</label>
@@ -79,81 +112,66 @@
             </div>
         </fieldset>
 
-        <div>
-            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
-            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">@(duzenlenenKisi.Id == 0 ? "İptal" : "Kapat")</button>
-        </div>
-    </EditForm>
-}
-
-@if (formAcik && belgeDurumSatirlari is not null)
-{
-    <div class="card card-body mb-3">
-        <h5>Belgeler</h5>
-        <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <thead>
-                <tr>
-                    <th>Belge</th>
-                    <th>Alındı</th>
-                    <th>Detay</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>KVKK Onay Formu</td>
-                    <td>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="kvkkAlindiCheck" @bind="duzenlenenKisi.KvkkOnayFormuAlindi" />
-                            <label class="form-check-label" for="kvkkAlindiCheck">Alındı</label>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <input type="date" class="form-control" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayTarihi" />
-                            <select class="form-select" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayDurumu">
-                                <option value="@KvkkOnayDurumu.Bilinmiyor">Bilinmiyor</option>
-                                <option value="@KvkkOnayDurumu.OnayVerildi">Onay Verildi</option>
-                                <option value="@KvkkOnayDurumu.OnayVerilmedi">Onay Verilmedi</option>
-                            </select>
-                        </div>
-                    </td>
-                </tr>
-                @foreach (var satir in belgeDurumSatirlari)
-                {
+        @if (belgeDurumSatirlari is not null)
+        {
+            <div class="table-responsive mb-3">
+            <table class="table table-striped align-middle">
+                <thead>
                     <tr>
-                        <td>@satir.Belge.BelgeTanimi</td>
+                        <th>Belge</th>
+                        <th>Alındı</th>
+                        <th>Detay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>KVKK Onay Formu</td>
                         <td>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="belge-alindi-@satir.Belge.Id" @bind="satir.Alindi" />
-                                <label class="form-check-label" for="belge-alindi-@satir.Belge.Id">Alındı</label>
+                                <input class="form-check-input" type="checkbox" id="kvkkAlindiCheck" @bind="duzenlenenKisi.KvkkOnayFormuAlindi" />
+                                <label class="form-check-label" for="kvkkAlindiCheck">Alındı</label>
                             </div>
                         </td>
                         <td>
-                            @if (satir.Belge.GecerlilikTarihiKontrolu)
-                            {
-                                <input type="date" class="form-control" style="width: auto; display: inline-block;" @bind="satir.GecerlilikTarihi" />
-                                @if (satir.GecerlilikTarihi is not null && satir.GecerlilikTarihi.Value.Date < DateTime.Today)
-                                {
-                                    <span class="badge bg-danger ms-2">Süresi geçmiş</span>
-                                }
-                            }
+                            <div class="d-flex gap-2 flex-wrap">
+                                <input type="date" class="form-control" style="width: auto;" disabled="@(!duzenlenenKisi.KvkkOnayFormuAlindi)" @bind="duzenlenenKisi.KvkkOnayTarihi" />
+                                <select class="form-select" style="width: auto;" @bind="duzenlenenKisi.KvkkOnayDurumu">
+                                    <option value="@KvkkOnayDurumu.Bilinmiyor">Bilinmiyor</option>
+                                    <option value="@KvkkOnayDurumu.OnayVerildi">Onay Verildi</option>
+                                    <option value="@KvkkOnayDurumu.OnayVerilmedi">Onay Verilmedi</option>
+                                </select>
+                            </div>
                         </td>
                     </tr>
-                }
-            </tbody>
-        </table>
+                    @foreach (var satir in belgeDurumSatirlari)
+                    {
+                        <tr>
+                            <td>@satir.Belge.BelgeTanimi</td>
+                            <td>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="belge-alindi-@satir.Belge.Id" @bind="satir.Alindi" />
+                                    <label class="form-check-label" for="belge-alindi-@satir.Belge.Id">Alındı</label>
+                                </div>
+                            </td>
+                            <td>
+                                @if (satir.Belge.GecerlilikTarihiKontrolu)
+                                {
+                                    <input type="date" class="form-control" style="width: auto; display: inline-block;" disabled="@(!satir.Alindi)" @bind="satir.GecerlilikTarihi" />
+                                    @if (satir.GecerlilikTarihi is not null && satir.GecerlilikTarihi.Value.Date < DateTime.Today)
+                                    {
+                                        <span class="badge bg-danger ms-2">Süresi geçmiş</span>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+            </div>
         </div>
-        <button class="btn btn-lg btn-success mt-2" @onclick="BelgeleriKaydet">Belgeleri Kaydet</button>
-        @if (belgeHataMesaji is not null)
-        {
-            <div class="alert alert-danger mt-2">@belgeHataMesaji</div>
-        }
-        @if (belgeBasariMesaji is not null)
-        {
-            <div class="alert alert-success mt-2">@belgeBasariMesaji</div>
-        }
-    </div>
+    </EditForm>
 }
 
 @if (!formAcik)
@@ -168,21 +186,31 @@ else if (kisiler.Count == 0)
 }
 else
 {
+    <div class="mb-3">
+        <input type="search" class="form-control" style="max-width: 400px;" placeholder="Ara (kimlik no, ad soyad, firma, telefon)..." @bind="aramaMetni" @bind:event="oninput" />
+    </div>
+
+    @if (!GorunenKisiler.Any())
+    {
+        <p>Aramanızla eşleşen kayıt bulunamadı.</p>
+    }
+    else
+    {
     <div class="table-responsive">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
-                <th>Kimlik No</th>
-                <th>Ad Soyad</th>
-                <th>Firma</th>
-                <th>Telefon</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("KimlikNumarasi")'>Kimlik No @SiralamaIsareti("KimlikNumarasi")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("AdSoyad")'>Ad Soyad @SiralamaIsareti("AdSoyad")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("FirmaAdi")'>Firma @SiralamaIsareti("FirmaAdi")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("Telefon")'>Telefon @SiralamaIsareti("Telefon")</th>
                 <th>Nitelik</th>
-                <th>Durum</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("Durum")'>Durum @SiralamaIsareti("Durum")</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var kisi in kisiler)
+            @foreach (var kisi in GorunenKisiler)
             {
                 <tr>
                     <td>@kisi.KimlikNumarasi</td>
@@ -225,8 +253,11 @@ else
         </tbody>
     </table>
     </div>
+    }
 }
 }
+
+</div>
 
 @code {
     private List<Kisi>? kisiler;
@@ -234,10 +265,66 @@ else
     private Kisi duzenlenenKisi = new();
     private bool formAcik;
     private string? hataMesaji;
+    private string? basariMesaji;
+    private bool basariUyariMi;
+
+    private string aramaMetni = string.Empty;
+    private string siralamaAlani = "AdSoyad";
+    private bool siralamaArtan = true;
+
+    private List<Kisi> EslesenKisiler =>
+        string.IsNullOrWhiteSpace(duzenlenenKisi.KimlikNumarasi) || kisiler is null
+            ? []
+            : kisiler
+                .Where(k => k.KimlikNumarasi.Contains(duzenlenenKisi.KimlikNumarasi.Trim(), StringComparison.OrdinalIgnoreCase))
+                .Take(5)
+                .ToList();
+
+    private IEnumerable<Kisi> GorunenKisiler
+    {
+        get
+        {
+            IEnumerable<Kisi> sonuc = kisiler ?? [];
+
+            if (!string.IsNullOrWhiteSpace(aramaMetni))
+            {
+                var arama = aramaMetni.Trim();
+                sonuc = sonuc.Where(k =>
+                    (k.KimlikNumarasi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.AdSoyad?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.FirmaAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.Telefon?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            sonuc = siralamaAlani switch
+            {
+                "KimlikNumarasi" => siralamaArtan ? sonuc.OrderBy(k => k.KimlikNumarasi) : sonuc.OrderByDescending(k => k.KimlikNumarasi),
+                "FirmaAdi" => siralamaArtan ? sonuc.OrderBy(k => k.FirmaAdi) : sonuc.OrderByDescending(k => k.FirmaAdi),
+                "Telefon" => siralamaArtan ? sonuc.OrderBy(k => k.Telefon) : sonuc.OrderByDescending(k => k.Telefon),
+                "Durum" => siralamaArtan ? sonuc.OrderBy(k => k.Aktif) : sonuc.OrderByDescending(k => k.Aktif),
+                _ => siralamaArtan ? sonuc.OrderBy(k => k.AdSoyad) : sonuc.OrderByDescending(k => k.AdSoyad),
+            };
+
+            return sonuc;
+        }
+    }
+
+    private void SiralamayiDegistir(string alan)
+    {
+        if (siralamaAlani == alan)
+        {
+            siralamaArtan = !siralamaArtan;
+        }
+        else
+        {
+            siralamaAlani = alan;
+            siralamaArtan = true;
+        }
+    }
+
+    private string SiralamaIsareti(string alan) => siralamaAlani != alan ? "" : (siralamaArtan ? "▲" : "▼");
 
     private List<BelgeDurumSatiri>? belgeDurumSatirlari;
-    private string? belgeHataMesaji;
-    private string? belgeBasariMesaji;
 
     private sealed class BelgeDurumSatiri
     {
@@ -262,14 +349,13 @@ else
             .ToListAsync();
     }
 
-    private void YeniKisiBaslat()
+    private async Task YeniKisiBaslat()
     {
         duzenlenenKisi = new Kisi { Aktif = true };
         hataMesaji = null;
-        belgeDurumSatirlari = null;
-        belgeHataMesaji = null;
-        belgeBasariMesaji = null;
+        basariMesaji = null;
         formAcik = true;
+        await BelgeDurumlariniYukle(null);
     }
 
     private async Task DuzenlemeBaslat(Kisi kisi)
@@ -291,8 +377,7 @@ else
             KvkkOnayTarihi = kisi.KvkkOnayTarihi
         };
         hataMesaji = null;
-        belgeHataMesaji = null;
-        belgeBasariMesaji = null;
+        basariMesaji = null;
         formAcik = true;
         await BelgeDurumlariniYukle(kisi.Id);
     }
@@ -304,16 +389,16 @@ else
         belgeDurumSatirlari = null;
     }
 
-    private async Task BelgeDurumlariniYukle(int kisiId)
+    private async Task BelgeDurumlariniYukle(int? kisiId)
     {
         var kurallar = await Db.KisiBelgeleri
             .Where(b => b.Aktif)
             .OrderBy(b => b.BelgeTanimi)
             .ToListAsync();
 
-        var mevcutDurumlar = await Db.KisiBelgeKontrolleri
-            .Where(k => k.KisiId == kisiId)
-            .ToListAsync();
+        var mevcutDurumlar = kisiId is int id
+            ? await Db.KisiBelgeKontrolleri.Where(k => k.KisiId == id).ToListAsync()
+            : [];
 
         belgeDurumSatirlari = kurallar.Select(kural =>
         {
@@ -327,65 +412,10 @@ else
         }).ToList();
     }
 
-    private async Task BelgeleriKaydet()
-    {
-        if (belgeDurumSatirlari is null)
-        {
-            return;
-        }
-
-        belgeHataMesaji = null;
-        belgeBasariMesaji = null;
-
-        try
-        {
-            var kisi = await Db.Kisiler.FindAsync(duzenlenenKisi.Id);
-            if (kisi is null)
-            {
-                belgeHataMesaji = "Kişi bulunamadı, sayfayı yenileyin.";
-                return;
-            }
-
-            kisi.KvkkOnayFormuAlindi = duzenlenenKisi.KvkkOnayFormuAlindi;
-            kisi.KvkkOnayDurumu = duzenlenenKisi.KvkkOnayDurumu;
-            kisi.KvkkOnayTarihi = duzenlenenKisi.KvkkOnayTarihi;
-
-            foreach (var satir in belgeDurumSatirlari)
-            {
-                var mevcut = await Db.KisiBelgeKontrolleri
-                    .FirstOrDefaultAsync(k => k.KisiId == duzenlenenKisi.Id && k.KisiBelgeId == satir.Belge.Id);
-
-                var gecerlilikTarihi = satir.Belge.GecerlilikTarihiKontrolu ? satir.GecerlilikTarihi : null;
-
-                if (mevcut is null)
-                {
-                    Db.KisiBelgeKontrolleri.Add(new KisiBelgeKontrol
-                    {
-                        KisiId = duzenlenenKisi.Id,
-                        KisiBelgeId = satir.Belge.Id,
-                        AlindiSonucu = satir.Alindi,
-                        GecerlilikTarihiSonucu = gecerlilikTarihi
-                    });
-                }
-                else
-                {
-                    mevcut.AlindiSonucu = satir.Alindi;
-                    mevcut.GecerlilikTarihiSonucu = gecerlilikTarihi;
-                }
-            }
-
-            await Db.SaveChangesAsync();
-            belgeBasariMesaji = "Belge durumları kaydedildi.";
-        }
-        catch (DbUpdateException)
-        {
-            belgeHataMesaji = "Belgeler kaydedilirken bir hata oluştu.";
-        }
-    }
-
     private async Task Kaydet()
     {
         hataMesaji = null;
+        basariMesaji = null;
 
         // Yasaklanma Sebebi yalnızca Pasif kişilerde tutulur (bkz. CK_Kisiler_YasaklanmaSebebi_Aktif).
         if (duzenlenenKisi.Aktif)
@@ -393,11 +423,23 @@ else
             duzenlenenKisi.YasaklanmaSebebi = null;
         }
 
+        // Alındı işaretli değilse tarih anlamsızdır, temizlenir ve kullanıcı uyarılır.
+        var uyariBelgeleri = new List<string>();
+        if (!duzenlenenKisi.KvkkOnayFormuAlindi && duzenlenenKisi.KvkkOnayTarihi is not null)
+        {
+            uyariBelgeleri.Add("KVKK Onay Formu");
+            duzenlenenKisi.KvkkOnayTarihi = null;
+        }
+
         try
         {
-            if (duzenlenenKisi.Id == 0)
+            Kisi kisi;
+            var yeniKayit = duzenlenenKisi.Id == 0;
+
+            if (yeniKayit)
             {
-                Db.Kisiler.Add(duzenlenenKisi);
+                kisi = duzenlenenKisi;
+                Db.Kisiler.Add(kisi);
             }
             else
             {
@@ -420,11 +462,70 @@ else
                 mevcut.KvkkOnayFormuAlindi = duzenlenenKisi.KvkkOnayFormuAlindi;
                 mevcut.KvkkOnayDurumu = duzenlenenKisi.KvkkOnayDurumu;
                 mevcut.KvkkOnayTarihi = duzenlenenKisi.KvkkOnayTarihi;
+                kisi = mevcut;
+            }
+
+            if (belgeDurumSatirlari is not null)
+            {
+                foreach (var satir in belgeDurumSatirlari)
+                {
+                    if (!satir.Alindi && satir.GecerlilikTarihi is not null)
+                    {
+                        uyariBelgeleri.Add(satir.Belge.BelgeTanimi);
+                        satir.GecerlilikTarihi = null;
+                    }
+
+                    var gecerlilikTarihi = satir.Belge.GecerlilikTarihiKontrolu ? satir.GecerlilikTarihi : null;
+
+                    var mevcutKontrol = yeniKayit
+                        ? null
+                        : await Db.KisiBelgeKontrolleri
+                            .FirstOrDefaultAsync(k => k.KisiId == kisi.Id && k.KisiBelgeId == satir.Belge.Id);
+
+                    if (mevcutKontrol is null)
+                    {
+                        var yeniKontrol = new KisiBelgeKontrol
+                        {
+                            KisiBelgeId = satir.Belge.Id,
+                            AlindiSonucu = satir.Alindi,
+                            GecerlilikTarihiSonucu = gecerlilikTarihi
+                        };
+
+                        // Yeni kişi için Id henüz atanmadı (SaveChanges'ten sonra
+                        // atanır) — navigation ile ilişki kurulur, EF Core FK'yı
+                        // otomatik doldurur.
+                        if (yeniKayit)
+                        {
+                            yeniKontrol.Kisi = kisi;
+                        }
+                        else
+                        {
+                            yeniKontrol.KisiId = kisi.Id;
+                        }
+
+                        Db.KisiBelgeKontrolleri.Add(yeniKontrol);
+                    }
+                    else
+                    {
+                        mevcutKontrol.AlindiSonucu = satir.Alindi;
+                        mevcutKontrol.GecerlilikTarihiSonucu = gecerlilikTarihi;
+                    }
+                }
             }
 
             await Db.SaveChangesAsync();
             await ListeyiYenile();
-            await BelgeDurumlariniYukle(duzenlenenKisi.Id);
+
+            basariUyariMi = uyariBelgeleri.Count > 0;
+            var mesaj = basariUyariMi
+                ? $"Kaydedildi. Alındı işaretli olmadığı için şu belgelerin tarihi boş kaydedildi: {string.Join(", ", uyariBelgeleri)}."
+                : "Kaydedildi.";
+
+            // Yeni kayıt butonuna basılmış gibi ekran temizlenir — art arda
+            // hızlı veri girişine izin vermek için.
+            duzenlenenKisi = new Kisi { Aktif = true };
+            await BelgeDurumlariniYukle(null);
+            basariMesaji = mesaj;
         }
         catch (DbUpdateException)
         {

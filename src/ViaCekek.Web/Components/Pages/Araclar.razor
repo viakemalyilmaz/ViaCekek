@@ -9,6 +9,8 @@
 
 <PageTitle>Araç Tanımları</PageTitle>
 
+<div class="araclar-page @(formAcik ? "form-open" : null)">
+
 <h3>Araç Tanımları</h3>
 
 @if (hataMesaji is not null)
@@ -16,22 +18,53 @@
     <div class="alert alert-danger">@hataMesaji</div>
 }
 
-<button class="btn btn-lg btn-primary mb-3" @onclick="YeniAracBaslat">+ Yeni Araç</button>
+@if (!formAcik)
+{
+    <button class="btn btn-lg btn-primary mb-3" @onclick="YeniAracBaslat">+ Yeni Araç</button>
+}
 
 @if (formAcik)
 {
-    <EditForm Model="duzenlenenArac" OnValidSubmit="Kaydet" class="card card-body mb-3">
+    <EditForm Model="duzenlenenArac" OnValidSubmit="Kaydet" class="form-scroll-layout">
         <DataAnnotationsValidator />
+
+        <div class="form-sticky-actions">
+            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">Kapat</button>
+            @if (basariMesaji is not null)
+            {
+                <div class="alert @(basariUyariMi ? "alert-warning" : "alert-success") mt-2 mb-0">@basariMesaji</div>
+            }
+        </div>
+
+        <div class="form-scroll-content">
+            <div class="card card-body">
         <ValidationSummary />
 
         <div class="row">
             <div class="col-md-4 mb-2">
                 <label class="form-label">Takip Numarası</label>
-                <InputText class="form-control" @bind-Value="duzenlenenArac.TakipNumarasi" />
+                <input class="form-control" @bind="duzenlenenArac.TakipNumarasi" @bind:event="oninput" autocomplete="off" />
+                @if (duzenlenenArac.Id == 0 && EslesenAraclar.Count > 0)
+                {
+                    <div class="list-group mt-1">
+                        @foreach (var eslesen in EslesenAraclar)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => DuzenlemeBaslat(eslesen)">
+                                <strong>@eslesen.TakipNumarasi</strong> — @AracTuruAdi(eslesen.AracTuru)
+                                @if (!eslesen.Aktif)
+                                {
+                                    <span class="badge bg-secondary ms-1">Pasif</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                    <div class="form-text">Bu takip numarasıyla kayıt zaten var — üzerine tıklayarak düzenleyebilirsin.</div>
+                }
             </div>
             <div class="col-md-4 mb-2">
                 <label class="form-label">Araç Türü</label>
-                <InputSelect class="form-select" @bind-Value="duzenlenenArac.AracTuru">
+                <InputSelect class="form-select" @bind-Value="duzenlenenArac.AracTuru" @bind-Value:after="AracTuruDegisti">
                     <option value="@AracTuru.Arac">Araç</option>
                     <option value="@AracTuru.Vinc">Vinç</option>
                     <option value="@AracTuru.Vidanjor">Vidanjör</option>
@@ -64,13 +97,59 @@
             </div>
         }
 
-        <div>
-            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
-            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">İptal</button>
+        @if (belgeDurumSatirlari is not null)
+        {
+            <p class="text-muted mb-2">@AracTuruAdi(duzenlenenArac.AracTuru) için geçerli belgeler:</p>
+            @if (belgeDurumSatirlari.Count == 0)
+            {
+                <p class="text-muted">Bu araç türü için tanımlı belge yok.</p>
+            }
+            else
+            {
+                <div class="table-responsive mb-3">
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Belge</th>
+                            <th>Alındı</th>
+                            <th>Detay</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var satir in belgeDurumSatirlari)
+                        {
+                            <tr>
+                                <td>@satir.Belge.BelgeTanimi</td>
+                                <td>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="belge-alindi-@satir.Belge.Id" @bind="satir.Alindi" />
+                                        <label class="form-check-label" for="belge-alindi-@satir.Belge.Id">Alındı</label>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (satir.Belge.GecerlilikTarihiKontrolu)
+                                    {
+                                        <input type="date" class="form-control" style="width: auto; display: inline-block;" disabled="@(!satir.Alindi)" @bind="satir.GecerlilikTarihi" />
+                                        @if (satir.GecerlilikTarihi is not null && satir.GecerlilikTarihi.Value.Date < DateTime.Today)
+                                        {
+                                            <span class="badge bg-danger ms-2">Süresi geçmiş</span>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                </div>
+            }
+        }
+            </div>
         </div>
     </EditForm>
 }
 
+@if (!formAcik)
+{
 @if (araclar is null)
 {
     <p>Yükleniyor...</p>
@@ -81,19 +160,29 @@ else if (araclar.Count == 0)
 }
 else
 {
+    <div class="mb-3">
+        <input type="search" class="form-control" style="max-width: 400px;" placeholder="Ara (takip no, araç türü, firma)..." @bind="aramaMetni" @bind:event="oninput" />
+    </div>
+
+    @if (!GorunenAraclar.Any())
+    {
+        <p>Aramanızla eşleşen kayıt bulunamadı.</p>
+    }
+    else
+    {
     <div class="table-responsive">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
-                <th>Takip Numarası</th>
-                <th>Araç Türü</th>
-                <th>Firma</th>
-                <th>Durum</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("TakipNumarasi")'>Takip Numarası @SiralamaIsareti("TakipNumarasi")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("AracTuru")'>Araç Türü @SiralamaIsareti("AracTuru")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("FirmaAdi")'>Firma @SiralamaIsareti("FirmaAdi")</th>
+                <th role="button" class="text-nowrap" @onclick='() => SiralamayiDegistir("Durum")'>Durum @SiralamaIsareti("Durum")</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var arac in araclar)
+            @foreach (var arac in GorunenAraclar)
             {
                 <tr>
                     <td>@arac.TakipNumarasi</td>
@@ -121,7 +210,11 @@ else
         </tbody>
     </table>
     </div>
+    }
 }
+}
+
+</div>
 
 @code {
     private List<Arac>? araclar;
@@ -129,6 +222,71 @@ else
     private Arac duzenlenenArac = new();
     private bool formAcik;
     private string? hataMesaji;
+    private string? basariMesaji;
+    private bool basariUyariMi;
+
+    private string aramaMetni = string.Empty;
+    private string siralamaAlani = "TakipNumarasi";
+    private bool siralamaArtan = true;
+
+    private List<Arac> EslesenAraclar =>
+        string.IsNullOrWhiteSpace(duzenlenenArac.TakipNumarasi) || araclar is null
+            ? []
+            : araclar
+                .Where(a => a.TakipNumarasi.Contains(duzenlenenArac.TakipNumarasi.Trim(), StringComparison.OrdinalIgnoreCase))
+                .Take(5)
+                .ToList();
+
+    private IEnumerable<Arac> GorunenAraclar
+    {
+        get
+        {
+            IEnumerable<Arac> sonuc = araclar ?? [];
+
+            if (!string.IsNullOrWhiteSpace(aramaMetni))
+            {
+                var arama = aramaMetni.Trim();
+                sonuc = sonuc.Where(a =>
+                    (a.TakipNumarasi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (a.FirmaAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    AracTuruAdi(a.AracTuru).Contains(arama, StringComparison.OrdinalIgnoreCase));
+            }
+
+            sonuc = siralamaAlani switch
+            {
+                "AracTuru" => siralamaArtan ? sonuc.OrderBy(a => AracTuruAdi(a.AracTuru)) : sonuc.OrderByDescending(a => AracTuruAdi(a.AracTuru)),
+                "FirmaAdi" => siralamaArtan ? sonuc.OrderBy(a => a.FirmaAdi) : sonuc.OrderByDescending(a => a.FirmaAdi),
+                "Durum" => siralamaArtan ? sonuc.OrderBy(a => a.Aktif) : sonuc.OrderByDescending(a => a.Aktif),
+                _ => siralamaArtan ? sonuc.OrderBy(a => a.TakipNumarasi) : sonuc.OrderByDescending(a => a.TakipNumarasi),
+            };
+
+            return sonuc;
+        }
+    }
+
+    private void SiralamayiDegistir(string alan)
+    {
+        if (siralamaAlani == alan)
+        {
+            siralamaArtan = !siralamaArtan;
+        }
+        else
+        {
+            siralamaAlani = alan;
+            siralamaArtan = true;
+        }
+    }
+
+    private string SiralamaIsareti(string alan) => siralamaAlani != alan ? "" : (siralamaArtan ? "▲" : "▼");
+
+    private List<BelgeDurumSatiri>? belgeDurumSatirlari;
+
+    private sealed class BelgeDurumSatiri
+    {
+        public AracBelge Belge { get; set; } = null!;
+        public bool Alindi { get; set; }
+        public DateTime? GecerlilikTarihi { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -156,14 +314,16 @@ else
         _ => tur.ToString()
     };
 
-    private void YeniAracBaslat()
+    private async Task YeniAracBaslat()
     {
         duzenlenenArac = new Arac { Aktif = true };
         hataMesaji = null;
+        basariMesaji = null;
         formAcik = true;
+        await BelgeDurumlariniYukle(null, duzenlenenArac.AracTuru);
     }
 
-    private void DuzenlemeBaslat(Arac arac)
+    private async Task DuzenlemeBaslat(Arac arac)
     {
         duzenlenenArac = new Arac
         {
@@ -175,18 +335,58 @@ else
             YasaklanmaSebebi = arac.YasaklanmaSebebi
         };
         hataMesaji = null;
+        basariMesaji = null;
         formAcik = true;
+        await BelgeDurumlariniYukle(arac.Id, arac.AracTuru);
     }
 
     private void FormuKapat()
     {
         formAcik = false;
         hataMesaji = null;
+        belgeDurumSatirlari = null;
+    }
+
+    private async Task AracTuruDegisti()
+    {
+        var aracId = duzenlenenArac.Id == 0 ? (int?)null : duzenlenenArac.Id;
+        await BelgeDurumlariniYukle(aracId, duzenlenenArac.AracTuru);
+    }
+
+    private async Task BelgeDurumlariniYukle(int? aracId, AracTuru aracTuru)
+    {
+        IQueryable<AracBelge> sorgu = Db.AracBelgeleri.Where(b => b.Aktif);
+        sorgu = aracTuru switch
+        {
+            AracTuru.Arac => sorgu.Where(b => b.GecerliArac),
+            AracTuru.Vinc => sorgu.Where(b => b.GecerliVinc),
+            AracTuru.Vidanjor => sorgu.Where(b => b.GecerliVidanjor),
+            AracTuru.Kompresor => sorgu.Where(b => b.GecerliKompresor),
+            AracTuru.BasincliKap => sorgu.Where(b => b.GecerliBasincliKap),
+            _ => sorgu
+        };
+        var kurallar = await sorgu.OrderBy(b => b.BelgeTanimi).ToListAsync();
+
+        var mevcutDurumlar = aracId is int id
+            ? await Db.AracBelgeKontrolleri.Where(k => k.AracId == id).ToListAsync()
+            : [];
+
+        belgeDurumSatirlari = kurallar.Select(kural =>
+        {
+            var mevcut = mevcutDurumlar.FirstOrDefault(d => d.AracBelgeId == kural.Id);
+            return new BelgeDurumSatiri
+            {
+                Belge = kural,
+                Alindi = mevcut?.AlindiSonucu ?? false,
+                GecerlilikTarihi = mevcut?.GecerlilikTarihiSonucu
+            };
+        }).ToList();
     }
 
     private async Task Kaydet()
     {
         hataMesaji = null;
+        basariMesaji = null;
 
         // Yasaklanma Sebebi yalnızca Pasif araçlarda tutulur (bkz. CK_Araclar_YasaklanmaSebebi_Aktif).
         if (duzenlenenArac.Aktif)
@@ -194,11 +394,18 @@ else
             duzenlenenArac.YasaklanmaSebebi = null;
         }
 
+        // Alındı işaretli değilse tarih anlamsızdır, temizlenir ve kullanıcı uyarılır.
+        var uyariBelgeleri = new List<string>();
+
         try
         {
-            if (duzenlenenArac.Id == 0)
+            Arac arac;
+            var yeniKayit = duzenlenenArac.Id == 0;
+
+            if (yeniKayit)
             {
-                Db.Araclar.Add(duzenlenenArac);
+                arac = duzenlenenArac;
+                Db.Araclar.Add(arac);
             }
             else
             {
@@ -214,11 +421,70 @@ else
                 mevcut.FirmaAdi = duzenlenenArac.FirmaAdi;
                 mevcut.Aktif = duzenlenenArac.Aktif;
                 mevcut.YasaklanmaSebebi = duzenlenenArac.YasaklanmaSebebi;
+                arac = mevcut;
+            }
+
+            if (belgeDurumSatirlari is not null)
+            {
+                foreach (var satir in belgeDurumSatirlari)
+                {
+                    if (!satir.Alindi && satir.GecerlilikTarihi is not null)
+                    {
+                        uyariBelgeleri.Add(satir.Belge.BelgeTanimi);
+                        satir.GecerlilikTarihi = null;
+                    }
+
+                    var gecerlilikTarihi = satir.Belge.GecerlilikTarihiKontrolu ? satir.GecerlilikTarihi : null;
+
+                    var mevcutKontrol = yeniKayit
+                        ? null
+                        : await Db.AracBelgeKontrolleri
+                            .FirstOrDefaultAsync(k => k.AracId == arac.Id && k.AracBelgeId == satir.Belge.Id);
+
+                    if (mevcutKontrol is null)
+                    {
+                        var yeniKontrol = new AracBelgeKontrol
+                        {
+                            AracBelgeId = satir.Belge.Id,
+                            AlindiSonucu = satir.Alindi,
+                            GecerlilikTarihiSonucu = gecerlilikTarihi
+                        };
+
+                        // Yeni araç için Id henüz atanmadı (SaveChanges'ten sonra
+                        // atanır) — navigation ile ilişki kurulur, EF Core FK'yı
+                        // otomatik doldurur.
+                        if (yeniKayit)
+                        {
+                            yeniKontrol.Arac = arac;
+                        }
+                        else
+                        {
+                            yeniKontrol.AracId = arac.Id;
+                        }
+
+                        Db.AracBelgeKontrolleri.Add(yeniKontrol);
+                    }
+                    else
+                    {
+                        mevcutKontrol.AlindiSonucu = satir.Alindi;
+                        mevcutKontrol.GecerlilikTarihiSonucu = gecerlilikTarihi;
+                    }
+                }
             }
 
             await Db.SaveChangesAsync();
-            formAcik = false;
             await ListeyiYenile();
+
+            basariUyariMi = uyariBelgeleri.Count > 0;
+            var mesaj = basariUyariMi
+                ? $"Kaydedildi. Alındı işaretli olmadığı için şu belgelerin tarihi boş kaydedildi: {string.Join(", ", uyariBelgeleri)}."
+                : "Kaydedildi.";
+
+            // Yeni kayıt butonuna basılmış gibi ekran temizlenir — art arda
+            // hızlı veri girişine izin vermek için.
+            duzenlenenArac = new Arac { Aktif = true };
+            await BelgeDurumlariniYukle(null, duzenlenenArac.AracTuru);
+            basariMesaji = mesaj;
         }
         catch (DbUpdateException)
         {

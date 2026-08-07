@@ -2,6 +2,10 @@
 bin/
 obj/
 out/
+publish/
+
+# Data Protection anahtarları (hassas, ortama özel — bkz. Program.cs)
+keys/
 
 # IDE / kullanıcıya özel dosyalar
 .vs/

@@ -17,39 +17,48 @@
     <div class="alert alert-danger">@hataMesaji</div>
 }
 
-<button class="btn btn-primary mb-3" @onclick="YeniKullaniciBaslat">+ Yeni Kullanıcı</button>
+<button class="btn btn-lg btn-primary mb-3" @onclick="YeniKullaniciBaslat">+ Yeni Kullanıcı</button>
 
 @if (formAcik)
 {
-    <EditForm Model="yeniKullanici" OnValidSubmit="Kaydet" class="card card-body mb-3">
+    <EditForm Model="formu" OnValidSubmit="Kaydet" class="card card-body mb-3">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
         <div class="mb-2">
             <label class="form-label">E-posta</label>
-            <InputText class="form-control" @bind-Value="yeniKullanici.Email" />
+            <InputText class="form-control" @bind-Value="formu.Email" disabled="@(formu.Id is not null)" />
         </div>
-        <div class="mb-2">
-            <label class="form-label">Şifre</label>
-            <InputText type="password" class="form-control" @bind-Value="yeniKullanici.Sifre" />
-        </div>
+        @if (formu.Id is null)
+        {
+            <div class="mb-2">
+                <label class="form-label">Şifre</label>
+                <InputText type="password" class="form-control" @bind-Value="formu.Sifre" />
+            </div>
+        }
         <div class="mb-3">
             <label class="form-label">Rol</label>
-            <InputSelect class="form-select" @bind-Value="yeniKullanici.Rol">
+            <InputSelect class="form-select" @bind-Value="formu.Rol">
                 @foreach (var rol in Roller.Hepsi)
                 {
                     <option value="@rol">@rol</option>
                 }
             </InputSelect>
         </div>
+        <div class="form-check mb-3">
+            <InputCheckbox class="form-check-input" @bind-Value="formu.Aktif" id="aktifCheck" />
+            <label class="form-check-label" for="aktifCheck">Aktif</label>
+        </div>
 
         <div>
-            <button type="submit" class="btn btn-success">Kaydet</button>
-            <button type="button" class="btn btn-secondary" @onclick="FormuKapat">İptal</button>
+            <button type="submit" class="btn btn-lg btn-success">Kaydet</button>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FormuKapat">Kapat</button>
         </div>
     </EditForm>
 }
 
+@if (!formAcik)
+{
 @if (kullanicilar is null)
 {
     <p>Yükleniyor...</p>
@@ -62,32 +71,35 @@ else
             <tr>
                 <th>E-posta</th>
                 <th>Rol</th>
+                <th>Durum</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var (kullanici, mevcutRol) in kullanicilar)
+            @foreach (var (kullanici, rol, aktif) in kullanicilar)
             {
                 <tr>
                     <td>@kullanici.Email</td>
+                    <td>@rol</td>
                     <td>
-                        <select class="form-select form-select-sm" style="width: auto; display: inline-block;"
-                                value="@mevcutRol"
-                                @onchange="e => RolDegistir(kullanici, e.Value?.ToString())">
-                            @foreach (var rol in Roller.Hepsi)
-                            {
-                                <option value="@rol">@rol</option>
-                            }
-                        </select>
+                        @if (aktif)
+                        {
+                            <span class="badge bg-success">Aktif</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Pasif</span>
+                        }
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => SifreSifirlamaBaslat(kullanici)">Şifre Sıfırla</button>
+                        <button class="btn btn-outline-primary" @onclick="() => DuzenlemeBaslat(kullanici, rol, aktif)">Düzenle</button>
+                        <button class="btn btn-outline-secondary" @onclick="() => SifreSifirlamaBaslat(kullanici)">Şifre Sıfırla</button>
                     </td>
                 </tr>
                 @if (sifreSifirlananKullaniciId == kullanici.Id)
                 {
                     <tr>
-                        <td colspan="3">
+                        <td colspan="4">
                             <EditForm Model="sifreSifirlama" OnValidSubmit="SifreSifirla" class="card card-body">
                                 <DataAnnotationsValidator />
                                 <ValidationSummary />
@@ -100,8 +112,8 @@ else
                                     <InputText type="password" class="form-control" @bind-Value="sifreSifirlama.YeniSifre" />
                                 </div>
                                 <div>
-                                    <button type="submit" class="btn btn-success btn-sm">Şifreyi Değiştir</button>
-                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="SifreSifirlamaIptal">İptal</button>
+                                    <button type="submit" class="btn btn-success">Şifreyi Değiştir</button>
+                                    <button type="button" class="btn btn-secondary" @onclick="SifreSifirlamaIptal">Kapat</button>
                                 </div>
                             </EditForm>
                         </td>
@@ -112,10 +124,11 @@ else
     </table>
     </div>
 }
+}
 
 @code {
-    private List<(ApplicationUser Kullanici, string? Rol)>? kullanicilar;
-    private YeniKullaniciModeli yeniKullanici = new();
+    private List<(ApplicationUser Kullanici, string? Rol, bool Aktif)>? kullanicilar;
+    private KullaniciFormu formu = new();
     private bool formAcik;
     private string? hataMesaji;
 
@@ -131,18 +144,32 @@ else
     private async Task ListeyiYenile()
     {
         var tumKullanicilar = UserManager.Users.ToList();
-        var liste = new List<(ApplicationUser, string?)>();
+        var liste = new List<(ApplicationUser, string?, bool)>();
         foreach (var kullanici in tumKullanicilar)
         {
             var roller = await UserManager.GetRolesAsync(kullanici);
-            liste.Add((kullanici, roller.FirstOrDefault()));
+            var aktif = kullanici.LockoutEnd is null || kullanici.LockoutEnd <= DateTimeOffset.UtcNow;
+            liste.Add((kullanici, roller.FirstOrDefault(), aktif));
         }
         kullanicilar = liste.OrderBy(k => k.Item1.Email).ToList();
     }
 
     private void YeniKullaniciBaslat()
     {
-        yeniKullanici = new YeniKullaniciModeli { Rol = Roller.Guvenlik };
+        formu = new KullaniciFormu { Rol = Roller.Guvenlik, Aktif = true };
+        hataMesaji = null;
+        formAcik = true;
+    }
+
+    private void DuzenlemeBaslat(ApplicationUser kullanici, string? rol, bool aktif)
+    {
+        formu = new KullaniciFormu
+        {
+            Id = kullanici.Id,
+            Email = kullanici.Email ?? string.Empty,
+            Rol = rol ?? Roller.Guvenlik,
+            Aktif = aktif
+        };
         hataMesaji = null;
         formAcik = true;
     }
@@ -157,40 +184,55 @@ else
     {
         hataMesaji = null;
 
-        var kullanici = new ApplicationUser
+        if (formu.Id is null)
         {
-            UserName = yeniKullanici.Email,
-            Email = yeniKullanici.Email,
-            EmailConfirmed = true
-        };
+            if (string.IsNullOrWhiteSpace(formu.Sifre))
+            {
+                hataMesaji = "Şifre zorunludur.";
+                return;
+            }
 
-        var sonuc = await UserManager.CreateAsync(kullanici, yeniKullanici.Sifre);
-        if (!sonuc.Succeeded)
-        {
-            hataMesaji = string.Join(" ", sonuc.Errors.Select(e => e.Description));
-            return;
+            var yeniKullanici = new ApplicationUser
+            {
+                UserName = formu.Email,
+                Email = formu.Email,
+                EmailConfirmed = true
+            };
+
+            var sonuc = await UserManager.CreateAsync(yeniKullanici, formu.Sifre);
+            if (!sonuc.Succeeded)
+            {
+                hataMesaji = string.Join(" ", sonuc.Errors.Select(e => e.Description));
+                return;
+            }
+
+            await UserManager.AddToRoleAsync(yeniKullanici, formu.Rol);
+
+            if (!formu.Aktif)
+            {
+                await UserManager.SetLockoutEndDateAsync(yeniKullanici, DateTimeOffset.MaxValue);
+            }
         }
+        else
+        {
+            var kullanici = await UserManager.FindByIdAsync(formu.Id);
+            if (kullanici is null)
+            {
+                hataMesaji = "Kullanıcı bulunamadı, sayfayı yenileyin.";
+                return;
+            }
 
-        await UserManager.AddToRoleAsync(kullanici, yeniKullanici.Rol);
+            var mevcutRoller = await UserManager.GetRolesAsync(kullanici);
+            if (mevcutRoller.Count > 0)
+            {
+                await UserManager.RemoveFromRolesAsync(kullanici, mevcutRoller);
+            }
+            await UserManager.AddToRoleAsync(kullanici, formu.Rol);
+
+            await UserManager.SetLockoutEndDateAsync(kullanici, formu.Aktif ? null : DateTimeOffset.MaxValue);
+        }
 
         formAcik = false;
-        await ListeyiYenile();
-    }
-
-    private async Task RolDegistir(ApplicationUser kullanici, string? yeniRol)
-    {
-        if (string.IsNullOrEmpty(yeniRol))
-        {
-            return;
-        }
-
-        var mevcutRoller = await UserManager.GetRolesAsync(kullanici);
-        if (mevcutRoller.Count > 0)
-        {
-            await UserManager.RemoveFromRolesAsync(kullanici, mevcutRoller);
-        }
-
-        await UserManager.AddToRoleAsync(kullanici, yeniRol);
         await ListeyiYenile();
     }
 
@@ -229,16 +271,19 @@ else
         sifreSifirlananKullaniciId = null;
     }
 
-    private sealed class YeniKullaniciModeli
+    private sealed class KullaniciFormu
     {
+        public string? Id { get; set; }
+
         [Required, EmailAddress]
         public string Email { get; set; } = string.Empty;
 
-        [Required, MinLength(6)]
-        public string Sifre { get; set; } = string.Empty;
+        public string? Sifre { get; set; }
 
         [Required]
         public string Rol { get; set; } = Roller.Guvenlik;
+
+        public bool Aktif { get; set; } = true;
     }
 
     private sealed class SifreSifirlamaModeli
