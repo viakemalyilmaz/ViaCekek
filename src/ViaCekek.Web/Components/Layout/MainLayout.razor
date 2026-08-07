@@ -10,10 +10,14 @@
     </label>
     <div class="collapse navbar-collapse">
         <div class="navbar-nav me-auto">
-            <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru}")">
+            <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")">
                 <Authorized>
                     <a class="nav-link" href="kisiler">Kişiler</a>
                     <a class="nav-link" href="araclar">Araçlar</a>
+                </Authorized>
+            </AuthorizeView>
+            <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru}")">
+                <Authorized>
                     <a class="nav-link" href="tekneler">Tekneler</a>
                     <a class="nav-link" href="kisibelgeleri">Kişi Belgeleri</a>
                     <a class="nav-link" href="aracbelgeleri">Araç Belgeleri</a>
@@ -24,6 +28,7 @@
                     <a class="nav-link" href="kullanicilar">Kullanıcılar</a>
                 </Authorized>
             </AuthorizeView>
+            <a class="nav-link" href="docs/ViaCekek_Kullanim_Kilavuzu.pdf" target="_blank">Yardım</a>
         </div>
         <LoginDisplay />
     </div>

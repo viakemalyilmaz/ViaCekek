@@ -14,4 +14,13 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.29" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Kullanım kılavuzu PDF'i tek kaynak (docs/) üzerinden tutulur;
+         build/publish sırasında wwwroot/docs altına otomatik kopyalanır. -->
+    <Content Include="..\..\docs\ViaCekek_Kullanim_Kilavuzu.pdf" Link="wwwroot\docs\ViaCekek_Kullanim_Kilavuzu.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

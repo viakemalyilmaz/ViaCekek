@@ -390,7 +390,10 @@ Kullanıcı rolleri → 3 sabit rol ile netleşti (bkz. Kullanıcı Yönetimi).
 
 - 3 sabit rol (`Data/Roller.cs`): **Yönetici** (her şey: tanım ekranları +
   Çekek Takip + Kullanıcılar), **Saha Kontrolörü** (tanım ekranları +
-  Çekek Takip, Kullanıcılar hariç), **Güvenlik** (yalnızca Çekek Takip).
+  Çekek Takip, Kullanıcılar hariç), **Güvenlik** (Kişiler, Araçlar ve
+  Çekek Takip — Tekneler, Kişi/Araç Belgeleri, Kullanıcılar hariç;
+  2026-08-07'de Kişiler/Araçlar erişimi eklendi, sahada bu iki ekranı
+  kullanacaklar).
 - Roller ve `kemalyilmaz@viadmc.com` → Yönetici ataması, uygulama her
   başladığında `Program.cs`'de idempotent olarak garanti edilir (yoksa
   oluşturulur, varsa dokunulmaz).

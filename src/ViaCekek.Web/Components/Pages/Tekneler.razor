@@ -5,6 +5,7 @@
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
+@using ViaCekek.Web.Models.Common
 @inject ApplicationDbContext Db
 
 <PageTitle>Tekne Tanımları</PageTitle>
@@ -26,11 +27,11 @@
 
         <div class="mb-2">
             <label class="form-label">Tekne Kodu</label>
-            <InputText class="form-control" @bind-Value="duzenlenenTekne.TekneKodu" />
+            <input class="form-control" @bind:get="duzenlenenTekne.TekneKodu" @bind:set="v => duzenlenenTekne.TekneKodu = MetinYardimci.BuyukHarf(v)!" @bind:event="oninput" />
         </div>
         <div class="mb-2">
             <label class="form-label">Tekne Adı</label>
-            <InputText class="form-control" @bind-Value="duzenlenenTekne.TekneAdi" />
+            <input class="form-control" @bind:get="duzenlenenTekne.TekneAdi" @bind:set="v => duzenlenenTekne.TekneAdi = MetinYardimci.BuyukHarf(v)!" @bind:event="oninput" />
         </div>
         <div class="form-check mb-3">
             <InputCheckbox class="form-check-input" @bind-Value="duzenlenenTekne.Aktif" id="aktifCheck" />

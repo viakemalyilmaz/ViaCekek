@@ -1,10 +1,11 @@
 @page "/araclar"
-@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
+@using ViaCekek.Web.Models.Common
 @inject ApplicationDbContext Db
 
 <PageTitle>Araç Tanımları</PageTitle>
@@ -44,7 +45,7 @@
         <div class="row">
             <div class="col-md-4 mb-2">
                 <label class="form-label">Takip Numarası</label>
-                <input class="form-control" @bind="duzenlenenArac.TakipNumarasi" @bind:event="oninput" autocomplete="off" />
+                <input class="form-control" @bind:get="duzenlenenArac.TakipNumarasi" @bind:set="v => duzenlenenArac.TakipNumarasi = MetinYardimci.BuyukHarf(v)!" @bind:event="oninput" autocomplete="off" />
                 @if (duzenlenenArac.Id == 0 && EslesenAraclar.Count > 0)
                 {
                     <div class="list-group mt-1">
@@ -74,7 +75,7 @@
             </div>
             <div class="col-md-4 mb-2">
                 <label class="form-label">Firma Adı</label>
-                <input class="form-control" list="firmaListesi" @bind="duzenlenenArac.FirmaAdi" />
+                <input class="form-control" list="firmaListesi" @bind:get="duzenlenenArac.FirmaAdi" @bind:set="v => duzenlenenArac.FirmaAdi = MetinYardimci.BuyukHarf(v)" @bind:event="oninput" />
                 <datalist id="firmaListesi">
                     @foreach (var firma in firmaOnerileri)
                     {
@@ -93,7 +94,7 @@
         {
             <div class="mb-3">
                 <label class="form-label">Yasaklanma Sebebi</label>
-                <InputText class="form-control" @bind-Value="duzenlenenArac.YasaklanmaSebebi" />
+                <input class="form-control" @bind:get="duzenlenenArac.YasaklanmaSebebi" @bind:set="v => duzenlenenArac.YasaklanmaSebebi = MetinYardimci.BuyukHarf(v)" @bind:event="oninput" />
             </div>
         }
 
