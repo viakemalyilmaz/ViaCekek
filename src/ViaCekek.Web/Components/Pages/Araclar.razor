@@ -289,9 +289,29 @@ else
         public DateTime? GecerlilikTarihi { get; set; }
     }
 
+    [SupplyParameterFromQuery(Name = "duzenle")]
+    public int? SorguDuzenleId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "yeniTakip")]
+    public string? SorguYeniTakip { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         await ListeyiYenile();
+
+        if (SorguDuzenleId is int id)
+        {
+            var arac = araclar?.FirstOrDefault(a => a.Id == id);
+            if (arac is not null)
+            {
+                await DuzenlemeBaslat(arac);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(SorguYeniTakip))
+        {
+            await YeniAracBaslat();
+            duzenlenenArac.TakipNumarasi = SorguYeniTakip;
+        }
     }
 
     private async Task ListeyiYenile()

@@ -10,7 +10,7 @@
 
 <PageTitle>Çekek Takip</PageTitle>
 
-<h3>Çekek Takip — Kişi Girişi</h3>
+<h3>Çekek Takip</h3>
 
 @if (basariMesaji is not null)
 {
@@ -20,22 +20,41 @@
 @if (asama == Asama.Sorgu)
 {
     <form @onsubmit="KontrolYap" class="card card-body mb-3">
-        <div class="mb-3" style="max-width: 400px;">
-            <label class="form-label">Kimlik Numarası</label>
-            <input class="form-control form-control-lg"
-                   @bind:get="kimlikNumarasi" @bind:set="KimlikNumarasiDegisti" @bind:event="oninput"
-                   autocomplete="off" autofocus />
-            @if (eslesenKisiler.Count > 0)
-            {
-                <div class="list-group mt-1">
-                    @foreach (var eslesen in eslesenKisiler)
-                    {
-                        <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => EslesenSec(eslesen)">
-                            <strong>@eslesen.KimlikNumarasi</strong> — @eslesen.AdSoyad
-                        </button>
-                    }
-                </div>
-            }
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Kimlik Numarası (Kişi)</label>
+                <input class="form-control form-control-lg"
+                       @bind:get="kimlikNumarasi" @bind:set="KimlikNumarasiDegisti" @bind:event="oninput"
+                       autocomplete="off" autofocus />
+                @if (eslesenKisiler.Count > 0)
+                {
+                    <div class="list-group mt-1">
+                        @foreach (var eslesen in eslesenKisiler)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => EslesenKisiSec(eslesen)">
+                                <strong>@eslesen.KimlikNumarasi</strong> — @eslesen.AdSoyad
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Takip Numarası (Araç)</label>
+                <input class="form-control form-control-lg"
+                       @bind:get="takipNumarasi" @bind:set="TakipNumarasiDegisti" @bind:event="oninput"
+                       autocomplete="off" />
+                @if (eslesenAraclar.Count > 0)
+                {
+                    <div class="list-group mt-1">
+                        @foreach (var eslesen in eslesenAraclar)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => EslesenAracSec(eslesen)">
+                                <strong>@eslesen.TakipNumarasi</strong> — @AracTuruAdi(eslesen.AracTuru)
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
         </div>
 
         <div class="mb-3">
@@ -54,11 +73,11 @@
             <button type="submit" class="btn btn-lg btn-primary">Kontrol</button>
         </div>
 
-        @if (engelMesaji is not null)
+        @if (kisiEngelMesaji is not null)
         {
             <div class="alert alert-danger mt-3">
-                @engelMesaji
-                @if (engelYonlendirmeGoster)
+                <strong>Kişi:</strong> @kisiEngelMesaji
+                @if (kisiEngelYonlendirmeGoster)
                 {
                     <div class="mt-2">
                         @if (bulunanKisiId is int engelKisiId)
@@ -74,12 +93,12 @@
             </div>
         }
 
-        @if (eksikBelgeler.Count > 0)
+        @if (kisiEksikBelgeler.Count > 0)
         {
             <div class="alert alert-danger mt-3">
-                <div>Eksik/süresi geçmiş belge(ler):</div>
+                <div><strong>Kişi</strong> — Eksik/süresi geçmiş belge(ler):</div>
                 <ul class="mb-2">
-                    @foreach (var belge in eksikBelgeler)
+                    @foreach (var belge in kisiEksikBelgeler)
                     {
                         <li>@belge</li>
                     }
@@ -87,9 +106,43 @@
                 <a class="btn btn-outline-primary" href="@($"kisiler?duzenle={bulunanKisiId}")">Kişi Tanımları'na git</a>
             </div>
         }
+
+        @if (aracEngelMesaji is not null)
+        {
+            <div class="alert alert-danger mt-3">
+                <strong>Araç:</strong> @aracEngelMesaji
+                @if (aracEngelYonlendirmeGoster)
+                {
+                    <div class="mt-2">
+                        @if (bulunanAracId is int engelAracId)
+                        {
+                            <a class="btn btn-outline-primary" href="@($"araclar?duzenle={engelAracId}")">Araç Tanımları'na git</a>
+                        }
+                        else
+                        {
+                            <a class="btn btn-outline-primary" href="@($"araclar?yeniTakip={Uri.EscapeDataString(takipNumarasi.Trim())}")">+ Yeni Araç ekle</a>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (aracEksikBelgeler.Count > 0)
+        {
+            <div class="alert alert-danger mt-3">
+                <div><strong>Araç</strong> — Eksik/süresi geçmiş belge(ler):</div>
+                <ul class="mb-2">
+                    @foreach (var belge in aracEksikBelgeler)
+                    {
+                        <li>@belge</li>
+                    }
+                </ul>
+                <a class="btn btn-outline-primary" href="@($"araclar?duzenle={bulunanAracId}")">Araç Tanımları'na git</a>
+            </div>
+        }
     </form>
 }
-else if (asama == Asama.Onay && bulunanKisi is not null)
+else if (asama == Asama.Onay)
 {
     <div class="card card-body mb-3">
         @if (yaklasanBelgeler.Count > 0)
@@ -104,11 +157,55 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
                 </ul>
             </div>
         }
-        <div class="row">
-            <div class="col-md-4 mb-2">
-                <label class="form-label">Ad Soyad</label>
-                <input class="form-control form-control-lg" value="@bulunanKisi.AdSoyad" disabled />
+
+        <div class="mb-3">
+            @if (bulunanKisi is not null)
+            {
+                <div><strong>Kişi:</strong> @bulunanKisi.KimlikNumarasi — @bulunanKisi.AdSoyad</div>
+            }
+            @if (bulunanArac is not null)
+            {
+                <div><strong>Araç:</strong> @bulunanArac.TakipNumarasi — @AracTuruAdi(bulunanArac.AracTuru)</div>
+            }
+        </div>
+
+        @if (bulunanKisi is null && !string.IsNullOrWhiteSpace(kimlikNumarasi))
+        {
+            <div class="alert alert-warning">
+                <div>Kişi girişi yapılmayacak — sadece araç girişi kaydedilecek.</div>
+                @if (kisiEngelMesaji is not null)
+                {
+                    <div>@kisiEngelMesaji</div>
+                }
+                @if (kisiEksikBelgeler.Count > 0)
+                {
+                    <div>Eksik/süresi geçmiş belge(ler): @string.Join(", ", kisiEksikBelgeler)</div>
+                }
             </div>
+        }
+        @if (bulunanArac is null && !string.IsNullOrWhiteSpace(takipNumarasi))
+        {
+            <div class="alert alert-warning">
+                <div>Araç girişi yapılmayacak — sadece kişi girişi kaydedilecek.</div>
+                @if (aracEngelMesaji is not null)
+                {
+                    <div>@aracEngelMesaji</div>
+                }
+                @if (aracEksikBelgeler.Count > 0)
+                {
+                    <div>Eksik/süresi geçmiş belge(ler): @string.Join(", ", aracEksikBelgeler)</div>
+                }
+            </div>
+        }
+
+        <div class="row">
+            @if (bulunanKisi is not null)
+            {
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">Ad Soyad</label>
+                    <input class="form-control form-control-lg" value="@bulunanKisi.AdSoyad" disabled />
+                </div>
+            }
             <div class="col-md-4 mb-2">
                 <label class="form-label">Firma Adı</label>
                 <input class="form-control form-control-lg" @bind:get="onayFirmaAdi" @bind:set="v => onayFirmaAdi = MetinYardimci.BuyukHarf(v)" @bind:event="oninput" />
@@ -163,15 +260,23 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
 
     private Asama asama = Asama.Sorgu;
     private string kimlikNumarasi = string.Empty;
+    private string takipNumarasi = string.Empty;
     private List<Kisi> eslesenKisiler = [];
+    private List<Arac> eslesenAraclar = [];
     private ZiyaretSebebi ziyaretSebebi = ZiyaretSebebi.Calisma;
 
-    private string? engelMesaji;
-    private bool engelYonlendirmeGoster;
-    private List<string> eksikBelgeler = [];
-
+    private string? kisiEngelMesaji;
+    private bool kisiEngelYonlendirmeGoster;
+    private List<string> kisiEksikBelgeler = [];
     private Kisi? bulunanKisi;
     private int? bulunanKisiId;
+
+    private string? aracEngelMesaji;
+    private bool aracEngelYonlendirmeGoster;
+    private List<string> aracEksikBelgeler = [];
+    private Arac? bulunanArac;
+    private int? bulunanAracId;
+
     private string? onayFirmaAdi;
     private string? onayTelefon;
     private int? onayTekneId;
@@ -199,6 +304,16 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
         _ => sebep.ToString()
     };
 
+    private static string AracTuruAdi(AracTuru tur) => tur switch
+    {
+        AracTuru.Arac => "Araç",
+        AracTuru.Vinc => "Vinç",
+        AracTuru.Vidanjor => "Vidanjör",
+        AracTuru.Kompresor => "Kompresör",
+        AracTuru.BasincliKap => "Basınçlı Kap",
+        _ => tur.ToString()
+    };
+
     private static bool ZiyaretSebebineUygulanir(KisiBelge belge, ZiyaretSebebi sebep) => sebep switch
     {
         ZiyaretSebebi.Calisma => belge.GecerliCalisma,
@@ -211,8 +326,19 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
         _ => false
     };
 
+    private static bool AracTurineUygulanir(AracBelge belge, AracTuru tur) => tur switch
+    {
+        AracTuru.Arac => belge.GecerliArac,
+        AracTuru.Vinc => belge.GecerliVinc,
+        AracTuru.Vidanjor => belge.GecerliVidanjor,
+        AracTuru.Kompresor => belge.GecerliKompresor,
+        AracTuru.BasincliKap => belge.GecerliBasincliKap,
+        _ => false
+    };
+
     // Ziyaret Sebebi'ne göre içeride kalma süresi — süresiz sebeplerde null
-    // (bkz. CLAUDE.md > Zamanlayıcı).
+    // (bkz. CLAUDE.md > Zamanlayıcı). Araç girişinde de aynı Ziyaret
+    // Sebebi kullanılır.
     private static TimeSpan? SureLimiti(ZiyaretSebebi sebep) => sebep switch
     {
         ZiyaretSebebi.Kesif => TimeSpan.FromHours(1),
@@ -236,34 +362,87 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
                 .ToListAsync();
     }
 
-    private void EslesenSec(Kisi eslesen)
+    private void EslesenKisiSec(Kisi eslesen)
     {
         kimlikNumarasi = eslesen.KimlikNumarasi;
         eslesenKisiler = [];
     }
 
+    private async Task TakipNumarasiDegisti(string? v)
+    {
+        takipNumarasi = v ?? string.Empty;
+
+        var arama = takipNumarasi.Trim();
+        eslesenAraclar = string.IsNullOrEmpty(arama)
+            ? []
+            : await Db.Araclar.AsNoTracking()
+                .Where(a => a.TakipNumarasi.Contains(arama))
+                .OrderBy(a => a.TakipNumarasi)
+                .Take(5)
+                .ToListAsync();
+    }
+
+    private void EslesenAracSec(Arac eslesen)
+    {
+        takipNumarasi = eslesen.TakipNumarasi;
+        eslesenAraclar = [];
+    }
+
     private async Task KontrolYap()
     {
         basariMesaji = null;
-        engelMesaji = null;
-        engelYonlendirmeGoster = false;
-        eksikBelgeler = [];
+        kisiEngelMesaji = null;
+        kisiEngelYonlendirmeGoster = false;
+        kisiEksikBelgeler = [];
         bulunanKisi = null;
         bulunanKisiId = null;
+        aracEngelMesaji = null;
+        aracEngelYonlendirmeGoster = false;
+        aracEksikBelgeler = [];
+        bulunanArac = null;
+        bulunanAracId = null;
+        yaklasanBelgeler = [];
         eslesenKisiler = [];
+        eslesenAraclar = [];
 
         var kimlik = kimlikNumarasi.Trim();
-        if (string.IsNullOrWhiteSpace(kimlik))
+        var takip = takipNumarasi.Trim();
+
+        if (string.IsNullOrWhiteSpace(kimlik) && string.IsNullOrWhiteSpace(takip))
         {
-            engelMesaji = "Kimlik numarası girin.";
+            kisiEngelMesaji = "Kimlik numarası veya takip numarası girin.";
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(kimlik))
+        {
+            await KisiKontrolYap(kimlik);
+        }
+
+        if (!string.IsNullOrWhiteSpace(takip))
+        {
+            await AracKontrolYap(takip);
+        }
+
+        // İkisi birden başarılı olmak zorunda değil — hangisi geçerse
+        // Onay aşamasına geçilir, sadece başarılı olan(lar) kaydedilir.
+        if (bulunanKisi is not null || bulunanArac is not null)
+        {
+            onayFirmaAdi = bulunanKisi?.FirmaAdi ?? bulunanArac?.FirmaAdi;
+            onayTelefon = bulunanKisi?.Telefon;
+            onayTekneId = null;
+            onayAciklama = null;
+            asama = Asama.Onay;
+        }
+    }
+
+    private async Task KisiKontrolYap(string kimlik)
+    {
         var kisi = await Db.Kisiler.AsNoTracking().FirstOrDefaultAsync(k => k.KimlikNumarasi == kimlik);
         if (kisi is null)
         {
-            engelMesaji = "Bu kimlik numarasıyla kayıtlı bir kişi bulunamadı.";
-            engelYonlendirmeGoster = true;
+            kisiEngelMesaji = "Bu kimlik numarasıyla kayıtlı bir kişi bulunamadı.";
+            kisiEngelYonlendirmeGoster = true;
             return;
         }
 
@@ -271,17 +450,17 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
 
         if (!kisi.Aktif)
         {
-            engelMesaji = !string.IsNullOrEmpty(kisi.YasaklanmaSebebi)
+            kisiEngelMesaji = !string.IsNullOrEmpty(kisi.YasaklanmaSebebi)
                 ? $"Saha kontrolüne haber verilmeli, yasaklı kişi tespit edildi. (Sebep: {kisi.YasaklanmaSebebi})"
                 : "Bu kişi aktif değil.";
-            engelYonlendirmeGoster = true;
+            kisiEngelYonlendirmeGoster = true;
             return;
         }
 
         var acikKaydiVarMi = await Db.CekekTakipleri.AnyAsync(c => c.KisiId == kisi.Id && c.CikisTarihi == null);
         if (acikKaydiVarMi)
         {
-            engelMesaji = "Bu kişinin sahada çıkışı yapılmamış açık bir kaydı var, tekrar giriş yapılamaz.";
+            kisiEngelMesaji = "Bu kişinin sahada çıkışı yapılmamış açık bir kaydı var, tekrar giriş yapılamaz.";
             return;
         }
 
@@ -312,7 +491,7 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
 
         if (eksikler.Count > 0)
         {
-            eksikBelgeler = eksikler;
+            kisiEksikBelgeler = eksikler;
             return;
         }
 
@@ -337,16 +516,70 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
         yaklasanBelgeler = yaklasanlar;
 
         bulunanKisi = kisi;
-        onayFirmaAdi = kisi.FirmaAdi;
-        onayTelefon = kisi.Telefon;
-        onayTekneId = null;
-        onayAciklama = null;
-        asama = Asama.Onay;
+    }
+
+    private async Task AracKontrolYap(string takip)
+    {
+        var arac = await Db.Araclar.AsNoTracking().FirstOrDefaultAsync(a => a.TakipNumarasi == takip);
+        if (arac is null)
+        {
+            aracEngelMesaji = "Bu takip numarasıyla kayıtlı bir araç bulunamadı.";
+            aracEngelYonlendirmeGoster = true;
+            return;
+        }
+
+        bulunanAracId = arac.Id;
+
+        if (!arac.Aktif)
+        {
+            aracEngelMesaji = !string.IsNullOrEmpty(arac.YasaklanmaSebebi)
+                ? $"Saha kontrolüne haber verilmeli, yasaklı araç tespit edildi. (Sebep: {arac.YasaklanmaSebebi})"
+                : "Bu araç aktif değil.";
+            aracEngelYonlendirmeGoster = true;
+            return;
+        }
+
+        var acikKaydiVarMi = await Db.CekekTakipleri.AnyAsync(c => c.AracId == arac.Id && c.CikisTarihi == null);
+        if (acikKaydiVarMi)
+        {
+            aracEngelMesaji = "Bu aracın sahada çıkışı yapılmamış açık bir kaydı var, tekrar giriş yapılamaz.";
+            return;
+        }
+
+        // Araç belgeleri Ziyaret Sebebi'nden bağımsız, AracTuru'ne göre
+        // filtrelenir; KVKK benzeri özel bir kontrol yok.
+        var kurallar = await Db.AracBelgeleri.AsNoTracking().Where(b => b.Aktif).ToListAsync();
+        var uygulanabilirKurallar = kurallar.Where(b => AracTurineUygulanir(b, arac.AracTuru)).ToList();
+        var kontroller = await Db.AracBelgeKontrolleri.AsNoTracking().Where(k => k.AracId == arac.Id).ToListAsync();
+
+        var eksikler = new List<string>();
+
+        foreach (var kural in uygulanabilirKurallar)
+        {
+            var kontrol = kontroller.FirstOrDefault(k => k.AracBelgeId == kural.Id);
+            if (kontrol is null || !kontrol.AlindiSonucu)
+            {
+                eksikler.Add(kural.BelgeTanimi);
+            }
+            else if (kural.GecerlilikTarihiKontrolu &&
+                     (kontrol.GecerlilikTarihiSonucu is null || kontrol.GecerlilikTarihiSonucu.Value.Date < DateTime.Today))
+            {
+                eksikler.Add($"{kural.BelgeTanimi} (süresi geçmiş)");
+            }
+        }
+
+        if (eksikler.Count > 0)
+        {
+            aracEksikBelgeler = eksikler;
+            return;
+        }
+
+        bulunanArac = arac;
     }
 
     private async Task GirisKaydet()
     {
-        if (bulunanKisi is null)
+        if (bulunanKisi is null && bulunanArac is null)
         {
             return;
         }
@@ -355,43 +588,85 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
 
         try
         {
-            // bulunanKisi, KontrolYap'ta AsNoTracking ile okundu (başka
-            // sekmelerde yapılan güncellemeleri anında görebilmek için) —
-            // kaydetmeden önce izlenebilir (tracked) taze bir kopya çekilir.
-            var kisi = await Db.Kisiler.FindAsync(bulunanKisi.Id);
-            if (kisi is null)
-            {
-                hataMesaji = "Kişi bulunamadı, sayfayı yenileyin.";
-                return;
-            }
-
             var simdi = DateTime.Now;
             var sure = SureLimiti(ziyaretSebebi);
+            DateTime? beklenenBitis = sure is null ? null : simdi.Add(sure.Value);
 
-            var giris = new ViaCekek.Web.Models.CekekTakip
+            if (bulunanKisi is not null)
             {
-                KisiId = kisi.Id,
-                KimlikNumarasi = kisi.KimlikNumarasi,
-                AdSoyad = kisi.AdSoyad,
-                FirmaAdi = onayFirmaAdi,
-                Telefon = onayTelefon,
-                TekneId = onayTekneId,
-                GirisTarihi = DateOnly.FromDateTime(simdi),
-                GirisSaati = TimeOnly.FromDateTime(simdi),
-                ZiyaretSebebi = ziyaretSebebi,
-                Durum = CekekTakipDurumu.GirisYapildi,
-                BeklenenBitisZamani = sure is null ? null : simdi.Add(sure.Value),
-                Aciklama = onayAciklama
-            };
+                // bulunanKisi, KontrolYap'ta AsNoTracking ile okundu (başka
+                // sekmelerde yapılan güncellemeleri anında görebilmek için) —
+                // kaydetmeden önce izlenebilir (tracked) taze bir kopya çekilir.
+                var kisi = await Db.Kisiler.FindAsync(bulunanKisi.Id);
+                if (kisi is null)
+                {
+                    hataMesaji = "Kişi bulunamadı, sayfayı yenileyin.";
+                    return;
+                }
 
-            Db.CekekTakipleri.Add(giris);
+                var kisiGiris = new ViaCekek.Web.Models.CekekTakip
+                {
+                    KisiId = kisi.Id,
+                    KimlikNumarasi = kisi.KimlikNumarasi,
+                    AdSoyad = kisi.AdSoyad,
+                    FirmaAdi = onayFirmaAdi,
+                    Telefon = onayTelefon,
+                    TekneId = onayTekneId,
+                    GirisTarihi = DateOnly.FromDateTime(simdi),
+                    GirisSaati = TimeOnly.FromDateTime(simdi),
+                    ZiyaretSebebi = ziyaretSebebi,
+                    Durum = CekekTakipDurumu.GirisYapildi,
+                    BeklenenBitisZamani = beklenenBitis,
+                    Aciklama = onayAciklama
+                };
+                Db.CekekTakipleri.Add(kisiGiris);
 
-            kisi.FirmaAdi = onayFirmaAdi;
-            kisi.Telefon = onayTelefon;
+                kisi.FirmaAdi = onayFirmaAdi;
+                kisi.Telefon = onayTelefon;
+            }
+
+            if (bulunanArac is not null)
+            {
+                var arac = await Db.Araclar.FindAsync(bulunanArac.Id);
+                if (arac is null)
+                {
+                    hataMesaji = "Araç bulunamadı, sayfayı yenileyin.";
+                    return;
+                }
+
+                var aracGiris = new ViaCekek.Web.Models.CekekTakip
+                {
+                    AracId = arac.Id,
+                    TakipNumarasi = arac.TakipNumarasi,
+                    AdSoyad = bulunanKisi?.AdSoyad,
+                    FirmaAdi = onayFirmaAdi,
+                    Telefon = onayTelefon,
+                    TekneId = onayTekneId,
+                    GirisTarihi = DateOnly.FromDateTime(simdi),
+                    GirisSaati = TimeOnly.FromDateTime(simdi),
+                    ZiyaretSebebi = ziyaretSebebi,
+                    Durum = CekekTakipDurumu.GirisYapildi,
+                    BeklenenBitisZamani = beklenenBitis,
+                    Aciklama = onayAciklama
+                };
+                Db.CekekTakipleri.Add(aracGiris);
+
+                arac.FirmaAdi = onayFirmaAdi;
+            }
 
             await Db.SaveChangesAsync();
 
-            basariMesaji = $"{kisi.AdSoyad} için giriş kaydedildi.";
+            var parcalar = new List<string>();
+            if (bulunanKisi is not null)
+            {
+                parcalar.Add(bulunanKisi.AdSoyad);
+            }
+            if (bulunanArac is not null)
+            {
+                parcalar.Add(bulunanArac.TakipNumarasi);
+            }
+            basariMesaji = $"{string.Join(" / ", parcalar)} için giriş kaydedildi.";
+
             SorguyaDon();
         }
         catch (DbUpdateException)
@@ -404,13 +679,20 @@ else if (asama == Asama.Onay && bulunanKisi is not null)
     {
         asama = Asama.Sorgu;
         kimlikNumarasi = string.Empty;
+        takipNumarasi = string.Empty;
         eslesenKisiler = [];
+        eslesenAraclar = [];
         bulunanKisi = null;
         bulunanKisiId = null;
-        eksikBelgeler = [];
+        kisiEksikBelgeler = [];
+        kisiEngelMesaji = null;
+        kisiEngelYonlendirmeGoster = false;
+        bulunanArac = null;
+        bulunanAracId = null;
+        aracEksikBelgeler = [];
+        aracEngelMesaji = null;
+        aracEngelYonlendirmeGoster = false;
         yaklasanBelgeler = [];
-        engelMesaji = null;
-        engelYonlendirmeGoster = false;
         hataMesaji = null;
     }
 }

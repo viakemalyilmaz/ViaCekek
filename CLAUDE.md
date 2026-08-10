@@ -146,46 +146,42 @@ tek taraflı yapılmaz.
 - **Git commit/push** (2026-08-06'dan itibaren): her değişiklikten sonra
   otomatik commit/push yapılmaz — yalnızca kullanıcı açıkça isteyince.
 
-## Sıradaki Adım (2026-08-07 itibarıyla)
+## Sıradaki Adım (2026-08-10 itibarıyla)
 
 Tüm tanım/kural ekranları tamamlandı, tablet/dokunmatik uyumluluk
 iyileştirmeleri yapıldı (bkz. ilgili bölüm). Kişi ve Araç tarafında belge
 girişi de tamamlandı (madde 1-3 aşağıda ✅). Çekek Takip — Kişi Girişi
-(Aşama 1: Sorgu + Onay) tamamlandı ve commit'lendi (madde 4 ✅). Kalan
-işler, üzerinde anlaşılan sıraya göre (2026-08-07):
+(Aşama 1: Sorgu + Onay, madde 4 ✅) ve Araç Girişi (madde 5 ✅) tamamlandı.
+Kalan işler:
 
+- ✅ **Araç Girişi tamamlandı (2026-08-10)**, aynı `/cekektakip`
+  sayfasına eklendi (ayrı ekran değil). Aşama 1'e Kimlik No'nun yanına
+  **Takip Numarası** eklendi — ikisi de opsiyonel, en az biri dolu
+  olmalı, ikisi birden de girilebilir (kişi + araç birlikte). Kontrol:
+  Kimlik No doluysa kişi zinciri, Takip No doluysa **bağımsız paralel**
+  araç zinciri (kayıtlı mı → yasaklı/pasif mi → açık kaydı var mı →
+  `AracTuru`'süne göre filtrelenmiş `AracBelgeleri` eksik mi — KVKK yok,
+  ziyaret sebebinden bağımsız). **İkisi birden başarılı olmak zorunda
+  değil** — hangisi geçerse Onay'a geçilir, yalnızca geçen(ler)
+  kaydedilir; diğeri başarısızsa Onay ekranında bilgi amaçlı uyarı
+  gösterilir. Onay: tek form (Ad Soyad kişi varsa salt okunur, Firma
+  Adı/Telefon/Tekne/Açıklama ortak) — ikisi birden geçtiyse aynı
+  (düzenlenmiş) Firma Adı/Telefon hem `Kisi` hem `Arac` kaydına senkron
+  yazılır (Araç'ta Telefon alanı yok, sadece `CekekTakip` satırında
+  bilgi amaçlı tutulur). Kimlik/Takip No alanlarının ikisinde de
+  Kişiler/Araçlar ekranlarındaki gibi yazarken eşleşen kayıt arama var.
+  `/araclar` ve `/kisiler`'e `?duzenle={id}` / `?yeniTakip=`/`?yeniKimlik=`
+  query-string destekleri eklendi (Çekek Takip'teki "eksik belge" /
+  "kayıtsız" yönlendirme linkleri için). Gerçek DB'ye karşı scratch
+  script'lerle uçtan uca doğrulandı (araç-only, kombine kayıt, açık
+  kayıt kontrolü, yasaklı araç).
 - ⚠️ **Sırada: Kişi Girişi — Aşama 2** = Zamanlayıcı (Durum geçişleri:
   `GirisYapildi` → `ZamanAsimi`, `BeklenenBitisZamani` kontrolü, "+15 dk"
   uzatma) + **Board ekranı** (son giren üstte, süresi geçenler öncelikli
   çıkar, satırda "Çıkış" butonu). Board tasarımı (hangi bilgiler
   görünecek, buton davranışları) henüz konuşulmadı — kodlamaya
-  başlamadan önce netleştirilecek.
-- Sonra: **Araç Girişi**. Aynı `/cekektakip` sayfasına eklenecek (ayrı
-  bir ekran değil), board `CekekTakipleri` tablosundan geldiği için
-  Kişi/Araç girişleri board'da otomatik olarak birlikte görünecek.
-  **Akış 2026-08-07'de netleşti (henüz UYGULANMADI)**, kullanıcının
-  verdiği örnek kayıtla (Id=5 KisiId dolu, Id=6 aynı GirişTarihi/Saati +
-  aynı Ad Soyad/Firma/Telefon ile AracId dolu) doğrulandı:
-  - Üç senaryo mümkün: yalnızca kişi, yalnızca araç, **kişi + araç
-    birlikte** (aynı anda iki `CekekTakip` satırı oluşur).
-  - Aşama 1 (Sorgu)'a **Takip Numarası** alanı, Kimlik Numarası'nın
-    yanına eklenir — ikisi de opsiyonel, en az biri dolu olmalı.
-    Ziyaret Sebebi ortak.
-  - Kontrol: Kimlik No doluysa mevcut kişi zinciri; Takip No doluysa
-    **bağımsız paralel** bir araç zinciri çalışır — kayıtlı mı → yasaklı/
-    pasif mi → açık (çıkışsız) kaydı var mı → `AracTuru`'süne göre
-    filtrelenmiş `AracBelgeleri` eksik mi (KVKK benzeri özel durum yok,
-    ve kişiden farklı olarak **ziyaret sebebinden bağımsız**). İkisi de
-    girildiyse ikisi de geçmeli, biri başarısızsa hiçbiri kaydedilmez.
-  - Onay: tek form — Ad Soyad (kişi varsa salt okunur), Firma Adı/
-    Telefon (kişi varsa kişiden; yalnızca araç girişinde Araç'ın kendi
-    `FirmaAdi`'ndan varsayılan alınır, Telefon'un `Arac` modelinde
-    karşılığı yok — sadece o `CekekTakip` satırına bilgi amaçlı yazılır),
-    Tekne, Açıklama — ortak.
-  - Kaydet: Kimlik No girildiyse `KisiId` satırı, Takip No girildiyse
-    **ayrıca** `AracId` satırı oluşur; ikisi birlikteyse ikisi de aynı
-    GirişTarihi/Saati, Ziyaret Sebebi, Açıklama, Tekne'yi ve kişinin
-    (düzenlenmiş) Ad Soyad/Firma/Telefon'unu taşır.
+  başlamadan önce netleştirilecek. Board artık Kişi ve Araç girişlerini
+  birlikte göstermeli.
 
 1. ✅ `KisiBelgeKontrolleri` şeması değişti: `KisiId` eklendi (zorunlu),
    `CekekTakipId` opsiyonel oldu, `UNIQUE(KisiId, KisiBelgeId)` eklendi
@@ -223,8 +219,11 @@ işler, üzerinde anlaşılan sıraya göre (2026-08-07):
    sorgu ekranına döner. Okuma sorguları `AsNoTracking` kullanır (başka
    sekmede yapılan güncellemelerin anında görülmesi için). Gerçek DB'ye
    karşı scratch script'lerle uçtan uca doğrulandı.
-5. ⚠️ Sırada: **Kişi Girişi — Aşama 2** (Zamanlayıcı + Board) ve sonrasında
-   **Araç Girişi** — bkz. yukarıdaki "Sıradaki Adım" bölümü.
+5. ✅ Çekek Takip — Araç Girişi eklendi (2026-08-10) — bkz. yukarıdaki
+   "Sıradaki Adım" bölümü.
+6. ⚠️ Sırada: **Kişi Girişi — Aşama 2** (Zamanlayıcı + Board), artık
+   Kişi ve Araç girişlerini birlikte gösterecek — bkz. yukarıdaki
+   "Sıradaki Adım" bölümü.
 
 ## Modüller (Geliştirme Sırası)
 
