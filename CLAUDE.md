@@ -72,7 +72,8 @@ tek taraflı yapılmaz.
     bazlı `@rendermode InteractiveServer` eklendi. **Ders**: yeni bir
     sayfa eklenince `@rendermode InteractiveServer` eklemek unutulmamalı
     — global kısayol Identity/Account statik render gereksinimiyle
-    çakışıyor, kullanılmamalı.
+    çakışıyor, kullanılmamalı. (Not: `Home.razor` 2026-08-10'da silindi,
+    `/` rotasını artık `Board.razor` kullanıyor — bkz. altta.)
   - `Components/Layout/MainLayout.razor` — üst navigasyon çubuğu (yeni
     modül eklendikçe nav-link buraya eklenir), `LoginDisplay.razor` —
     giriş/çıkış durumu
@@ -146,13 +147,14 @@ tek taraflı yapılmaz.
 - **Git commit/push** (2026-08-06'dan itibaren): her değişiklikten sonra
   otomatik commit/push yapılmaz — yalnızca kullanıcı açıkça isteyince.
 
-## Sıradaki Adım (2026-08-10 itibarıyla)
+## Sıradaki Adım (2026-08-11 itibarıyla)
 
-Tüm tanım/kural ekranları tamamlandı, tablet/dokunmatik uyumluluk
-iyileştirmeleri yapıldı (bkz. ilgili bölüm). Kişi ve Araç tarafında belge
-girişi de tamamlandı (madde 1-3 aşağıda ✅). Çekek Takip — Kişi Girişi
-(Aşama 1: Sorgu + Onay, madde 4 ✅) ve Araç Girişi (madde 5 ✅) tamamlandı.
-Kalan işler:
+Tüm tanım/kural ekranları, Çekek Takip (Kişi + Araç Girişi) ve Board
+ekranı tamamlandı (madde 1-6 aşağıda ✅). Kullanım kılavuzu (docs/) da
+bu ekranları kapsayacak şekilde güncellendi. **Açık Konular** neredeyse
+tamamen netleşti (2026-08-11) — tek kalan **Raporlama ihtiyaçları**
+(kullanıcı bilgi verecek). Bunun dışında planlı/bekleyen somut bir iş
+şu an yok; kullanıcı yeni konuları belirleyip bildirecek.
 
 - ✅ **Araç Girişi tamamlandı (2026-08-10)**, aynı `/cekektakip`
   sayfasına eklendi (ayrı ekran değil). Aşama 1'e Kimlik No'nun yanına
@@ -175,13 +177,36 @@ Kalan işler:
   "kayıtsız" yönlendirme linkleri için). Gerçek DB'ye karşı scratch
   script'lerle uçtan uca doğrulandı (araç-only, kombine kayıt, açık
   kayıt kontrolü, yasaklı araç).
-- ⚠️ **Sırada: Kişi Girişi — Aşama 2** = Zamanlayıcı (Durum geçişleri:
-  `GirisYapildi` → `ZamanAsimi`, `BeklenenBitisZamani` kontrolü, "+15 dk"
-  uzatma) + **Board ekranı** (son giren üstte, süresi geçenler öncelikli
-  çıkar, satırda "Çıkış" butonu). Board tasarımı (hangi bilgiler
-  görünecek, buton davranışları) henüz konuşulmadı — kodlamaya
-  başlamadan önce netleştirilecek. Board artık Kişi ve Araç girişlerini
-  birlikte göstermeli.
+- ✅ **Board ekranı tamamlandı (2026-08-10)**, uygulamanın **ana
+  sayfası** (`@page "/"`, eski `Home.razor` silindi; sol üstteki logo
+  linki zaten `/`'e gittiği için ayrıca değişiklik gerekmedi; navbar
+  menüsünde ayrı bir "Board" linki yok, gerek kalmadı). Kart bazlı
+  liste (tablo değil, tablette taranması daha kolay). Her kart bir
+  aktif (`Durum != CikisYapildi`) `CekekTakip` satırı — Kişi ve Araç
+  girişleri aynı listede birlikte görünür (ayrı satırlar olarak, birleş-
+  tirilmiyor). Solda 48px'lik renkli daire ikon: mavi + insan silueti
+  (kişi), turuncu + araç silueti (araç) — basit SVG primitifleriyle
+  (circle/ellipse/rect/polygon), harici ikon kütüphanesi yok. Üstte
+  arama kutusu (ad soyad/kimlik no/takip no/firma, canlı filtre). Sol
+  kenarlık + rozet rengi: yeşil = normal, kırmızı = `ZamanAsimi`
+  (`.board-karti-normal`/`.board-karti-kirmizi`, app.css); kalan süre
+  rozeti ayrıca yeşil/mat sarı (10 dk veya altı)/kırmızı/gri (süresiz).
+  **Sıralama**: süreli kayıtlar önce (kalan süresi en az/en çok geçmiş
+  olan en üstte), süresiz kayıtlar en sonda (**ilk giren en üstte** —
+  süreli grubun tersine). Sayfa her ziyaret edildiğinde (`ListeyiYenile`)
+  süresi geçmiş ama hâlâ `GirisYapildi` olan kayıtlar `ZamanAsimi`'ye
+  çevrilir — **ilk fazda otomatik/periyodik sayfa yenileme YOK**
+  (kullanıcı isteğiyle bilinçli olarak basit tutuldu), sadece sayfa her
+  açıldığında/işlem yapıldığında tazelenir. Her kartta **"+15 dk"**
+  (yalnızca `Durum == ZamanAsimi` iken görünür — süresi henüz dolmamış
+  kayıtlarda gösterilmez; basılınca yeni bitiş = **şu an + 15 dk**, eski
+  geçmiş bitiş tarihinden değil; `ZamanAsimi`yı `GirisYapildi`ya
+  resetler) ve **"Çıkış"** (ÇıkışTarihi/Saati yazar, Durum `CikisYapildi`
+  olur, karttan kaybolur) butonları var. Gerçek DB'ye karşı scratch
+  script'le doğrulandı (sıralama, otomatik durum geçişi, Çıkış, +15 dk).
+- **Karar (2026-08-11)**: Gerçek bir zamanlayıcı (`BackgroundService`)
+  kurulmayacak — Board'un sayfa ziyaretinde tazeleme yapan mevcut hafif
+  yaklaşımı kalıcı çözüm olarak kabul edildi, bu konu kapandı.
 
 1. ✅ `KisiBelgeKontrolleri` şeması değişti: `KisiId` eklendi (zorunlu),
    `CekekTakipId` opsiyonel oldu, `UNIQUE(KisiId, KisiBelgeId)` eklendi
@@ -221,9 +246,10 @@ Kalan işler:
    karşı scratch script'lerle uçtan uca doğrulandı.
 5. ✅ Çekek Takip — Araç Girişi eklendi (2026-08-10) — bkz. yukarıdaki
    "Sıradaki Adım" bölümü.
-6. ⚠️ Sırada: **Kişi Girişi — Aşama 2** (Zamanlayıcı + Board), artık
-   Kişi ve Araç girişlerini birlikte gösterecek — bkz. yukarıdaki
-   "Sıradaki Adım" bölümü.
+6. ✅ Board ekranı eklendi (2026-08-10), uygulamanın ana sayfası
+   (`@page "/"`, eski `Home.razor` silindi) — Kişi ve Araç girişlerini
+   birlikte gösterir. Gerçek zamanlayıcı (`BackgroundService`)
+   kurulmayacağına karar verildi (2026-08-11) — bu iş kapandı.
 
 ## Modüller (Geliştirme Sırası)
 
@@ -445,18 +471,9 @@ varsayımları kullanıcıyla konuşulup yukarıdaki akışa değiştirildi.
 
 ## Açık Konular / Netleştirilecekler
 
-Proje başlamadan önce netleşmesi gereken, henüz karara bağlanmamış konular:
-
-- **KVKK onayı nasıl alınacak**: Tablette imza/onay ekranı mı, yoksa
-  fiziksel form mu, yoksa tek tık onay mı?
-- **Zamanlayıcı kuralları**: Süre kuralları ve `Durum`/`BeklenenBitisZamani`
-  alanları netleşti (bkz. Zamanlayıcı bölümü). Açık kalan: gerçek
-  `BackgroundService` (module 7) ne zaman kurulacak, süresi geçmenin
-  board dışında bir anlamı (bildirim, otomatik çıkış vb.) olacak mı?
 - **Raporlama ihtiyaçları**: Sahada kimler var, geçmiş giriş/çıkış
-  raporları gibi ihtiyaçlar var mı, varsa kapsamı nedir?
-- **Araç–Kişi ilişkisi**: Bir aracın sahibi/kullanıcısı olan kişi nasıl
-  tutulacak (tek kişi mi, birden fazla mı)? Henüz modellenmedi.
+  raporları gibi ihtiyaçlar var mı, varsa kapsamı nedir? Kullanıcı bilgi
+  verecek, henüz gelmedi — tek açık konu bu.
 
 Çözülenler (referans için): Ziyaret Tipleri → `ZiyaretSebebi` sabit
 enum'u ile netleşti (Çalışma/Görüşme/Keşif/Kontrol/Malzeme Alma/Malzeme
@@ -464,6 +481,18 @@ Bırakma/İskele Kurma). Belge kontrol kuralları → `KisiBelgeleri`/`AracBelge
 üzerindeki checkbox'larla parametrize edildi. Tekne–Kişi ilişkisi →
 kalıcı bir alan yerine her girişte `CekekTakip.TekneId` ile çözüldü.
 Kullanıcı rolleri → 3 sabit rol ile netleşti (bkz. Kullanıcı Yönetimi).
+**KVKK onayı** (2026-08-11) → ayrı bir imza/form akışına gerek yok,
+mevcut belge-kontrolü yaklaşımı (Alındı checkbox, Kişi ekranında) yeterli
+kabul edildi, ek iş yok. **Zamanlayıcı** (2026-08-11) → gerçek bir
+`BackgroundService` kurulmayacak, Board'un sayfa ziyaretinde tazeleme
+yapan hafif yaklaşımı (bkz. Zamanlayıcı bölümü) kalıcı çözüm olarak
+kabul edildi. **Araç–Kişi ilişkisi** (2026-08-11) → kalıcı bir
+sahiplik/kullanıcı ilişkisi modellenmeyecek, kapsam dışı bırakıldı.
+**Yasaklı kişi/araç uyarısı** (2026-08-11) → Çekek Takip ekranındaki
+mevcut uyarı yeterli kabul edildi, bildirim vb. ek bir mekanizma
+istenmiyor. **Araca özgü belge detayları** (2026-08-11) → zaten
+`AracBelgeleri`nin `AracTuru`'ne göre filtrelemesiyle karşılanıyor, ayrı
+bir iş kalmadı.
 
 ## Kullanıcı Yönetimi (uygulandı, 2026-08-05)
 

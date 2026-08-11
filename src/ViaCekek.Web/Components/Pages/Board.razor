@@ -1,0 +1,272 @@
+@page "/"
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using ViaCekek.Web.Data
+@using ViaCekek.Web.Models
+@using CekekTakipKaydi = ViaCekek.Web.Models.CekekTakip
+@inject ApplicationDbContext Db
+
+<PageTitle>Çekek Board</PageTitle>
+
+<h3>Çekek Board</h3>
+
+@if (kayitlar is null)
+{
+    <p>Yükleniyor...</p>
+}
+else if (kayitlar.Count == 0)
+{
+    <p>Sahada bekleyen kayıt yok.</p>
+}
+else
+{
+    <div class="mb-3">
+        <input type="search" class="form-control form-control-lg" style="max-width: 400px;" placeholder="Ara (ad soyad, kimlik/takip no, firma)..." @bind="aramaMetni" @bind:event="oninput" />
+    </div>
+
+    @if (!GorunenKayitlar.Any())
+    {
+        <p>Aramanızla eşleşen kayıt bulunamadı.</p>
+    }
+    else
+    {
+        @foreach (var kayit in GorunenKayitlar)
+        {
+            var kirmizi = kayit.Durum == CekekTakipDurumu.ZamanAsimi;
+            var kisiMi = kayit.KisiId is not null;
+            <div class="card mb-2 @(kirmizi ? "board-karti-kirmizi" : "board-karti-normal")">
+                <div class="card-body d-flex flex-wrap align-items-center gap-3">
+                    <div class="board-avatar @(kisiMi ? "board-avatar-kisi" : "board-avatar-arac")">
+                        @if (kisiMi)
+                        {
+                            <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+                                <circle cx="12" cy="8" r="4" />
+                                <ellipse cx="12" cy="19" rx="8" ry="6" />
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+                                <rect x="2" y="12" width="20" height="5" rx="1.5" />
+                                <polygon points="6,12 8,7 16,7 18,12" />
+                                <circle cx="7" cy="18" r="2.3" />
+                                <circle cx="17" cy="18" r="2.3" />
+                            </svg>
+                        }
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="fs-5 fw-semibold">@Baslik(kayit)</div>
+                        <div class="text-muted">@AltBilgi(kayit)</div>
+                        <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+                            <span class="badge fs-6 @(kirmizi ? "bg-danger" : "bg-success")">@DurumMetni(kayit)</span>
+                            <span class="badge fs-6 bg-secondary">@GirisMetni(kayit)</span>
+                            <span class="badge fs-6 @SureRozetSinifi(kayit)">@SureMetni(kayit)</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        @if (kayit.Durum == CekekTakipDurumu.ZamanAsimi)
+                        {
+                            <button class="btn btn-lg btn-warning" @onclick="() => SureUzat(kayit.Id)">+15 dk</button>
+                        }
+                        <button class="btn btn-lg btn-danger" @onclick="() => CikisYap(kayit.Id)">Çıkış</button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    private List<CekekTakipKaydi>? kayitlar;
+    private string aramaMetni = string.Empty;
+
+    private IEnumerable<CekekTakipKaydi> GorunenKayitlar
+    {
+        get
+        {
+            IEnumerable<CekekTakipKaydi> sonuc = kayitlar ?? [];
+
+            if (!string.IsNullOrWhiteSpace(aramaMetni))
+            {
+                var arama = aramaMetni.Trim();
+                sonuc = sonuc.Where(k =>
+                    (k.AdSoyad?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.KimlikNumarasi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.TakipNumarasi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.FirmaAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            return sonuc;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ListeyiYenile();
+    }
+
+    private async Task ListeyiYenile()
+    {
+        // Board her ziyaret edildiğinde, süresi geçmiş ama hâlâ GirisYapildi
+        // olan kayıtlar ZamanAsimi'ye çevrilir (gerçek zamanlayıcı henüz
+        // yok, bkz. CLAUDE.md > Zamanlayıcı — bilerek hafif tutuldu).
+        var simdi = DateTime.Now;
+        var suresiGecenler = await Db.CekekTakipleri
+            .Where(c => c.Durum == CekekTakipDurumu.GirisYapildi && c.BeklenenBitisZamani != null && c.BeklenenBitisZamani < simdi)
+            .ToListAsync();
+        foreach (var kayit in suresiGecenler)
+        {
+            kayit.Durum = CekekTakipDurumu.ZamanAsimi;
+        }
+        if (suresiGecenler.Count > 0)
+        {
+            await Db.SaveChangesAsync();
+        }
+
+        var liste = await Db.CekekTakipleri
+            .AsNoTracking()
+            .Include(c => c.Arac)
+            .Include(c => c.Tekne)
+            .Where(c => c.Durum != CekekTakipDurumu.CikisYapildi)
+            .ToListAsync();
+
+        // Süreli kayıtlar önce (kalan süresi en az/en çok geçmiş olan en
+        // üstte), süresiz kayıtlar en sonda (ilk giren en üstte).
+        kayitlar = liste
+            .OrderBy(c => c.BeklenenBitisZamani is null)
+            .ThenBy(c => c.BeklenenBitisZamani)
+            .ThenBy(c => GirisZamani(c))
+            .ToList();
+    }
+
+    private static DateTime? GirisZamani(CekekTakipKaydi kayit) =>
+        kayit.GirisTarihi is { } gt && kayit.GirisSaati is { } gs ? gt.ToDateTime(gs) : null;
+
+    private static string Baslik(CekekTakipKaydi kayit)
+    {
+        if (kayit.KisiId is not null)
+        {
+            return kayit.AdSoyad ?? "(isimsiz)";
+        }
+
+        var turAdi = kayit.Arac is not null ? AracTuruAdi(kayit.Arac.AracTuru) : "Araç";
+        return $"{kayit.TakipNumarasi} — {turAdi}";
+    }
+
+    private static string AltBilgi(CekekTakipKaydi kayit)
+    {
+        var parcalar = new List<string>();
+        if (!string.IsNullOrWhiteSpace(kayit.FirmaAdi))
+        {
+            parcalar.Add(kayit.FirmaAdi);
+        }
+        parcalar.Add(ZiyaretSebebiAdi(kayit.ZiyaretSebebi));
+        if (kayit.Tekne is not null)
+        {
+            parcalar.Add($"Tekne: {kayit.Tekne.TekneKodu} — {kayit.Tekne.TekneAdi}");
+        }
+        return string.Join(" · ", parcalar);
+    }
+
+    private static string DurumMetni(CekekTakipKaydi kayit) =>
+        kayit.Durum == CekekTakipDurumu.ZamanAsimi ? "Süresi Geçti" : "İçeride";
+
+    private static string GirisMetni(CekekTakipKaydi kayit)
+    {
+        var girisZamani = GirisZamani(kayit);
+        return girisZamani is not null ? $"Giriş: {girisZamani:HH:mm}" : "Giriş: —";
+    }
+
+    private static string SureMetni(CekekTakipKaydi kayit)
+    {
+        if (kayit.BeklenenBitisZamani is null)
+        {
+            return "Süresiz";
+        }
+
+        var kalan = kayit.BeklenenBitisZamani.Value - DateTime.Now;
+        return kalan.TotalMinutes > 0
+            ? $"{(int)kalan.TotalMinutes} dk kaldı"
+            : $"{(int)Math.Abs(kalan.TotalMinutes)} dk geçti";
+    }
+
+    // Rozet rengi: süresiz = gri, süresi geçmiş = kırmızı, 10 dk veya
+    // altı kaldıysa = mat sarı (hatırlatma rengiyle tutarlı), aksi = yeşil.
+    private static string SureRozetSinifi(CekekTakipKaydi kayit)
+    {
+        if (kayit.BeklenenBitisZamani is null)
+        {
+            return "bg-secondary";
+        }
+
+        var kalanDakika = (kayit.BeklenenBitisZamani.Value - DateTime.Now).TotalMinutes;
+        if (kalanDakika <= 0)
+        {
+            return "bg-danger";
+        }
+        if (kalanDakika <= 10)
+        {
+            return "board-sure-sari";
+        }
+        return "bg-success";
+    }
+
+    private static string ZiyaretSebebiAdi(ZiyaretSebebi sebep) => sebep switch
+    {
+        ZiyaretSebebi.Calisma => "Çalışma",
+        ZiyaretSebebi.Gorusme => "Görüşme",
+        ZiyaretSebebi.Kesif => "Keşif",
+        ZiyaretSebebi.Kontrol => "Kontrol",
+        ZiyaretSebebi.MalzemeAlma => "Malzeme Alma",
+        ZiyaretSebebi.MalzemeBirakma => "Malzeme Bırakma",
+        ZiyaretSebebi.IskeleKurma => "İskele Kurma",
+        _ => sebep.ToString()
+    };
+
+    private static string AracTuruAdi(AracTuru tur) => tur switch
+    {
+        AracTuru.Arac => "Araç",
+        AracTuru.Vinc => "Vinç",
+        AracTuru.Vidanjor => "Vidanjör",
+        AracTuru.Kompresor => "Kompresör",
+        AracTuru.BasincliKap => "Basınçlı Kap",
+        _ => tur.ToString()
+    };
+
+    private async Task CikisYap(int id)
+    {
+        var kayit = await Db.CekekTakipleri.FindAsync(id);
+        if (kayit is null)
+        {
+            return;
+        }
+
+        var simdi = DateTime.Now;
+        kayit.CikisTarihi = DateOnly.FromDateTime(simdi);
+        kayit.CikisSaati = TimeOnly.FromDateTime(simdi);
+        kayit.Durum = CekekTakipDurumu.CikisYapildi;
+        await Db.SaveChangesAsync();
+
+        await ListeyiYenile();
+    }
+
+    private async Task SureUzat(int id)
+    {
+        var kayit = await Db.CekekTakipleri.FindAsync(id);
+        if (kayit is null || kayit.BeklenenBitisZamani is null)
+        {
+            return;
+        }
+
+        kayit.BeklenenBitisZamani = DateTime.Now.AddMinutes(15);
+        if (kayit.Durum == CekekTakipDurumu.ZamanAsimi)
+        {
+            kayit.Durum = CekekTakipDurumu.GirisYapildi;
+        }
+        await Db.SaveChangesAsync();
+
+        await ListeyiYenile();
+    }
+}

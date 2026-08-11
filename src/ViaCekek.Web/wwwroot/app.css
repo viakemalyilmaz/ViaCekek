@@ -112,3 +112,41 @@ h1:focus {
     padding: 0.75rem 1rem;
     color: #4a3800;
 }
+
+/* Board: sol kenarlık ile durum rengi — yeşil normal, kırmızı süresi
+   geçmiş (Durum = ZamanAsimi). */
+.board-karti-normal {
+    border-left: 6px solid #198754;
+}
+
+.board-karti-kirmizi {
+    border-left: 6px solid #dc3545;
+    background-color: #fff5f5;
+}
+
+/* Board: kalan süre rozeti için mat sarı — hatırlatma-kutusu ile aynı
+   ton, süresi yaklaşan (10 dk veya altı) kayıtları işaretler. */
+.board-sure-sari {
+    background-color: #e8c874;
+    color: #4a3800;
+}
+
+/* Board: kart solundaki Kişi/Araç simgesi — mavi kişi, turuncu araç. */
+.board-avatar {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+.board-avatar-kisi {
+    background-color: #0d6efd;
+}
+
+.board-avatar-arac {
+    background-color: #fd7e14;
+}
