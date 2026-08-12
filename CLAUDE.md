@@ -151,30 +151,74 @@ tek taraflı yapılmaz.
 
 ## Sıradaki Adım (2026-08-12 itibarıyla)
 
-Tüm tanım/kural ekranları, Çekek Takip (Kişi + Araç Girişi), Board ve
-Çekek Takip Raporu tamamlandı (madde 1-6 aşağıda ✅). Kullanım kılavuzu
-(docs/) da bu ekranları kapsayacak şekilde güncellendi.
+Tüm tanım/kural ekranları, Çekek Takip (Kişi + Araç Girişi), Board,
+Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
+Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
+sıradaki adım olarak güncellenmeli.
 
-Şu an açık/net bir sonraki adım yok — kullanıcı yeni konuları
-belirleyecek (bkz. Açık Konular).
+- ✅ **Kişiler Raporu eklendi (2026-08-12)**, `/kisilerraporu`
+  (Yönetici + Saha Kontrolörü; Güvenlik erişemez — Takip Raporu'yla aynı
+  `AuthorizeView` grubu, `MainLayout.razor`). `KisilerRaporu.razor`,
+  Takip Raporu'yla birebir aynı tasarım deseninde (sabit sütun + tipe
+  göre filtre + ClosedXML Excel export), namespace çakışması yok (`Kisi`
+  modeli ile `Kisiler.razor` sayfası çakışmıyor, alias gerekmedi).
+  Sütunlar: Kimlik No, Ad Soyad, Firma Adı, Telefon, Aktif, KVKK Onay
+  Durumu, KVKK Onay Formu Alındı, KVKK Onay Tarihi, Kaptan, Tekne Sahibi
+  — kullanıcının verdiği sabit liste. Metin sütunları → içerir/eşittir/
+  başlar ile; Aktif/KVKK Onay Formu Alındı/Kaptan/Tekne Sahibi →
+  Tümü/Evet/Hayır dropdown; KVKK Onay Durumu → enum dropdown;
+  KVKK Onay Tarihi → öncesi/sonrası/eşittir/arası, `Kisi.KvkkOnayTarihi`
+  `DateTime?` olduğu için filtre karşılaştırması `.Value.Date` ile saat
+  bileşenini atarak yapılıyor (rapor genelinde tarih filtreleri saat
+  içermez ilkesiyle tutarlı). Sonuçlar Ad Soyad'a göre alfabetik
+  sıralanıyor (Takip Raporu'nun giriş-tarihine-göre-en-yeni sıralamasının
+  aksine — burada "en son eklenen" değil "isim bul" kullanım deseni
+  öncelikli). Takip Raporu'nun aksine sayfa açılışında otomatik filtre
+  **yok** (Kişi listesinde "bugün" gibi doğal bir varsayılan yok),
+  kullanıcı Filtrele'ye basana kadar placeholder mesajı gösteriliyor.
+  Gerçek DB'ye karşı scratch script'le uçtan uca doğrulandı: Aktif/
+  Kaptan/TekneSahibi/KVKK Onay Durumu/KVKK Onay Formu Alındı eşitlik
+  filtreleri, KVKK Onay Tarihi'nin farklı saatte olsa bile doğru günü
+  eşitlik ve aralık ile yakaladığı, Ad Soyad metin arama.
+  **Bug + ders (2026-08-12)**: Aktif/Kaptan/Tekne Sahibi/KVKK Onay Formu
+  Alındı dropdown'larında "Evet" seçilince otomatik "Tümü"ye geri
+  dönüyordu. Kök sebep: `@bind` bir `bool?` alana bağlıyken Blazor'ın
+  `<select>` için üretip tarayıcıya ilettiği değer ile `<option
+  value="...">`'daki metin eşleşmiyordu (`@true`/`@false` Razor
+  ifadesiyle de aynı sorun sürdü — nullable bool + `<select>` ikilisi
+  güvenilir değil). **Çözüm**: bu dört alan artık `bool?` değil düz
+  `string` bir seçim alanına (`"true"`/`"false"`/`""`) bağlanıyor,
+  `Filtrele()` içinde `SecimToBool()` ile `bool?`'a çevriliyor. **Kural**:
+  bundan sonra rapor ekranlarında boolean dropdown filtreleri hep bu
+  string-arayüzü desenini kullanmalı, doğrudan `bool?` `@bind` denenmemeli
+  (enum `@bind` — KVKK Onay Durumu gibi — sorunsuz, yalnızca nullable
+  bool'a özgü bir kısıtlama).
 
-- ✅ **Çekek Takip Raporu tamamlandı (2026-08-12)**, `/rapor` (Yönetici +
+- ✅ **Takip Raporu adı değişti (2026-08-12)**: "Çekek Takip Raporu" →
+  "Takip Raporu" (sayfa başlığı, nav linki, Excel dosya adı öneki);
+  route hâlâ `/rapor` (bookmark/alışkanlık bozulmasın diye
+  değiştirilmedi, yalnızca görünen isim değişti).
+
+- ✅ **Takip Raporu tamamlandı (2026-08-12)**, `/rapor` (Yönetici +
   Saha Kontrolörü; Güvenlik erişemez — `MainLayout.razor`'da ayrı
   `AuthorizeView` grubunda). `CekekTakipRaporu.razor`, `@using
   CekekTakipKaydi = ViaCekek.Web.Models.CekekTakip` alias'ıyla (namespace
   çakışması için, bkz. Board notu) ve
   `@rendermode @(new InteractiveServerRenderMode(prerender: false))` ile.
   **Kapsam bilinçli basitleştirildi**: DB View yok, isimli/kayıtlı
-  filtreler yok (farklı ihtiyaçlar için ayrı sabit raporlar üretilecek),
-  Dynamic LINQ/ham SQL yok — sütunlar sabit olduğu için her filtre normal,
-  tip-güvenli `.Where()` koşulu. Sütunlar: Kimlik No / Takip No (birlikte
+  filtreler yok (farklı ihtiyaçlar için ayrı sabit raporlar üretilecek —
+  bkz. yukarıda Kişiler Raporu), Dynamic LINQ/ham SQL yok — sütunlar
+  sabit olduğu için her filtre normal, tip-güvenli `.Where()` koşulu.
+  Sütunlar: Kimlik No / Takip No (birlikte
   metin arama), Ad Soyad, Firma Adı, Telefon, **Araç Türü** (`Araclar`'a
   `Include` ile join, snapshot alanı değil), **Tekne** (`Tekneler`'e
   join), Ziyaret Sebebi, Giriş Tarihi/Saati, Çıkış Tarihi/Saati, **Durum**
   (metin karşılığı: Giriş Yapıldı/Süresi Geçti/Çıkış Yapıldı), Açıklama.
   **Kaydeden dahil değil** (kullanıcı istemiyor). Metin sütunları →
-  içerir/eşittir/başlar ile; tarih sütunları → öncesi/sonrası/arası;
-  Ziyaret Sebebi/Araç Türü/Tekne/Durum → dropdown. **Excel export**
+  içerir/eşittir/başlar ile; tarih sütunları → öncesi/sonrası/eşittir/
+  arası; Ziyaret Sebebi/Araç Türü/Tekne/Durum → dropdown. Sayfa
+  açıldığında Giriş Tarihi = bugün ile otomatik filtreli gelir
+  (`OnInitializedAsync` içinde `Filtrele()` çağrılır). **Excel export**
   ClosedXML (v0.105.1, ücretsiz/MIT — EPPlus'ın yeni sürümleri ticari
   lisans gerektirdiği için tercih edilmedi) ile `XLWorkbook` oluşturup
   `MemoryStream`'e yazılıyor, base64'e çevrilip yeni
@@ -326,7 +370,8 @@ Belgeleri yapıldı — Araç ve Araç Belgeleri ekranları sonraki adımlar.
    ekranı (kural tanımı: belge adı, kontrol kuralı, araç türü
    uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
 6. **Çekek Takip Ekranı** ✅ — Kişi + Araç Girişi (`/cekektakip`), Board
-   (`/`) ve Çekek Takip Raporu (`/rapor`) tamamlandı (bkz. Sıradaki Adım).
+   (`/`), Takip Raporu (`/rapor`) ve Kişiler Raporu (`/kisilerraporu`)
+   tamamlandı (bkz. Sıradaki Adım).
 7. **Zamanlayıcı / Durum Güncelleme Motoru** — gerçek bir
    `BackgroundService` kurulmayacağına karar verildi (2026-08-11, bkz.
    Açık Konular); Board'un sayfa ziyaretinde tazeleme yapan hafif

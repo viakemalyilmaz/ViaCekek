@@ -10,9 +10,9 @@
 @inject ApplicationDbContext Db
 @inject IJSRuntime JS
 
-<PageTitle>Çekek Takip Raporu</PageTitle>
+<PageTitle>Takip Raporu</PageTitle>
 
-<h3>Çekek Takip Raporu</h3>
+<h3>Takip Raporu</h3>
 
 <div class="card card-body mb-3">
     <div class="row g-3">
@@ -478,7 +478,7 @@ else
         workbook.SaveAs(akis);
         var base64 = Convert.ToBase64String(akis.ToArray());
 
-        var dosyaAdi = $"CekekTakipRaporu_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+        var dosyaAdi = $"TakipRaporu_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         await JS.InvokeVoidAsync("dosyaIndir", dosyaAdi, base64,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     }
