@@ -56,7 +56,9 @@ tek taraflı yapılmaz.
     uygulama tabloları
   - `Data/Migrations/` — EF Core migration geçmişi
   - `Components/Pages/` — ekranlar (örn. `Tekneler.razor`), her biri
-    `@attribute [Authorize]` + `@rendermode InteractiveServer`
+    `@attribute [Authorize]` + `@rendermode @(new InteractiveServerRenderMode(prerender: false))`
+    (2026-08-11'den itibaren — düz `InteractiveServer` kısayolu değil,
+    bkz. Zamanlayıcı bölümündeki "concurrent DbContext" notu)
   - `Components/App.razor` — **DENENDİ VE GERİ ALINDI (2026-08-06)**:
     `Home.razor`'da eksik olan `@rendermode InteractiveServer` yüzünden
     navbar toggler'ın tıklamaya yanıt vermemesi sorunu için önce
@@ -147,14 +149,42 @@ tek taraflı yapılmaz.
 - **Git commit/push** (2026-08-06'dan itibaren): her değişiklikten sonra
   otomatik commit/push yapılmaz — yalnızca kullanıcı açıkça isteyince.
 
-## Sıradaki Adım (2026-08-11 itibarıyla)
+## Sıradaki Adım (2026-08-12 itibarıyla)
 
-Tüm tanım/kural ekranları, Çekek Takip (Kişi + Araç Girişi) ve Board
-ekranı tamamlandı (madde 1-6 aşağıda ✅). Kullanım kılavuzu (docs/) da
-bu ekranları kapsayacak şekilde güncellendi. **Açık Konular** neredeyse
-tamamen netleşti (2026-08-11) — tek kalan **Raporlama ihtiyaçları**
-(kullanıcı bilgi verecek). Bunun dışında planlı/bekleyen somut bir iş
-şu an yok; kullanıcı yeni konuları belirleyip bildirecek.
+Tüm tanım/kural ekranları, Çekek Takip (Kişi + Araç Girişi), Board ve
+Çekek Takip Raporu tamamlandı (madde 1-6 aşağıda ✅). Kullanım kılavuzu
+(docs/) da bu ekranları kapsayacak şekilde güncellendi.
+
+Şu an açık/net bir sonraki adım yok — kullanıcı yeni konuları
+belirleyecek (bkz. Açık Konular).
+
+- ✅ **Çekek Takip Raporu tamamlandı (2026-08-12)**, `/rapor` (Yönetici +
+  Saha Kontrolörü; Güvenlik erişemez — `MainLayout.razor`'da ayrı
+  `AuthorizeView` grubunda). `CekekTakipRaporu.razor`, `@using
+  CekekTakipKaydi = ViaCekek.Web.Models.CekekTakip` alias'ıyla (namespace
+  çakışması için, bkz. Board notu) ve
+  `@rendermode @(new InteractiveServerRenderMode(prerender: false))` ile.
+  **Kapsam bilinçli basitleştirildi**: DB View yok, isimli/kayıtlı
+  filtreler yok (farklı ihtiyaçlar için ayrı sabit raporlar üretilecek),
+  Dynamic LINQ/ham SQL yok — sütunlar sabit olduğu için her filtre normal,
+  tip-güvenli `.Where()` koşulu. Sütunlar: Kimlik No / Takip No (birlikte
+  metin arama), Ad Soyad, Firma Adı, Telefon, **Araç Türü** (`Araclar`'a
+  `Include` ile join, snapshot alanı değil), **Tekne** (`Tekneler`'e
+  join), Ziyaret Sebebi, Giriş Tarihi/Saati, Çıkış Tarihi/Saati, **Durum**
+  (metin karşılığı: Giriş Yapıldı/Süresi Geçti/Çıkış Yapıldı), Açıklama.
+  **Kaydeden dahil değil** (kullanıcı istemiyor). Metin sütunları →
+  içerir/eşittir/başlar ile; tarih sütunları → öncesi/sonrası/arası;
+  Ziyaret Sebebi/Araç Türü/Tekne/Durum → dropdown. **Excel export**
+  ClosedXML (v0.105.1, ücretsiz/MIT — EPPlus'ın yeni sürümleri ticari
+  lisans gerektirdiği için tercih edilmedi) ile `XLWorkbook` oluşturup
+  `MemoryStream`'e yazılıyor, base64'e çevrilip yeni
+  `wwwroot/app.js`'teki `dosyaIndir()` (Blob + geçici `<a download>`)
+  fonksiyonuna `IJSRuntime.InvokeVoidAsync` ile gönderiliyor — ayrı bir
+  API endpoint'i açılmadı, proje tamamen Blazor component tabanlı kaldı.
+  Gerçek DB'ye karşı scratch script'le uçtan uca doğrulandı: Kimlik/Takip
+  No birleşik metin arama, Araç Türü join filtresi, Tekne filtresi, tarih
+  "arası" aralık filtresi, Durum filtresi ve ClosedXML export'un
+  (oluşturup geri okuyarak) doğru hücre değerleri ürettiği.
 
 - ✅ **Araç Girişi tamamlandı (2026-08-10)**, aynı `/cekektakip`
   sayfasına eklendi (ayrı ekran değil). Aşama 1'e Kimlik No'nun yanına
@@ -204,6 +234,24 @@ tamamen netleşti (2026-08-11) — tek kalan **Raporlama ihtiyaçları**
   resetler) ve **"Çıkış"** (ÇıkışTarihi/Saati yazar, Durum `CikisYapildi`
   olur, karttan kaybolur) butonları var. Gerçek DB'ye karşı scratch
   script'le doğrulandı (sıralama, otomatik durum geçişi, Çıkış, +15 dk).
+- **Düzeltildi, tüm ekranlara yayıldı (2026-08-11)**: "A second operation
+  was started on this context instance..." (concurrent DbContext) hatası
+  — herhangi bir sayfa **tam sayfa yüklemesiyle** (URL'e doğrudan gidiş,
+  yenileme, giriş sonrası yönlendirme — sadece SPA içi gezinme değil)
+  açıldığında, prerender + interaktif circuit'in `OnInitializedAsync`'i
+  aynı `DbContext` üzerinde çakışarak iki kez tetiklemesinden
+  kaynaklanıyordu. Önce yalnızca Board'da (ana sayfa olduğu için ilk
+  fark edilen yer) görüldü, sonra `/cekektakip`'te de aynı hata çıkınca
+  bunun aslında **tüm sayfaları** etkileyen bir risk olduğu anlaşıldı.
+  Çözüm tüm `Components/Pages/*.razor` dosyalarına uygulandı: sayfa
+  düzeyindeki `@rendermode InteractiveServer` →
+  `@rendermode @(new InteractiveServerRenderMode(prerender: false))`
+  — prerender kapatıldı, `OnInitializedAsync` artık her sayfada yalnızca
+  circuit bağlandığında bir kez çalışıyor. **Ders**: yeni bir sayfa
+  eklenince de bu şekilde (prerender: false) yazılmalı, düz
+  `InteractiveServer` kısayolu artık kullanılmamalı — Identity/Account
+  sayfaları hâlâ istisna (bkz. App.razor notu, onlar hiç rendermode
+  almamalı, statik kalmalı).
 - **Karar (2026-08-11)**: Gerçek bir zamanlayıcı (`BackgroundService`)
   kurulmayacak — Board'un sayfa ziyaretinde tazeleme yapan mevcut hafif
   yaklaşımı kalıcı çözüm olarak kabul edildi, bu konu kapandı.
@@ -277,12 +325,12 @@ Belgeleri yapıldı — Araç ve Araç Belgeleri ekranları sonraki adımlar.
 5. **Araç Belgeleri** ✅ — `AracBelgeleri` tablosu + `/aracbelgeleri`
    ekranı (kural tanımı: belge adı, kontrol kuralı, araç türü
    uygulanabilirliği) tamamlandı, kullanıcı testi bekleniyor
-6. **Çekek Takip Ekranı** ⚠️ kısmen — `CekekTakipleri` tablosu var ama
-   belge durumu şeması revize edilecek, ekran/UI henüz yok (bkz.
-   Sıradaki Adım — yarından devam)
-7. **Zamanlayıcı / Durum Güncelleme Motoru** — parametrik kurallara göre
-   giriş/çıkış kayıtlarının durumunu otomatik güncelleyen arka plan
-   servisi; henüz başlanmadı
+6. **Çekek Takip Ekranı** ✅ — Kişi + Araç Girişi (`/cekektakip`), Board
+   (`/`) ve Çekek Takip Raporu (`/rapor`) tamamlandı (bkz. Sıradaki Adım).
+7. **Zamanlayıcı / Durum Güncelleme Motoru** — gerçek bir
+   `BackgroundService` kurulmayacağına karar verildi (2026-08-11, bkz.
+   Açık Konular); Board'un sayfa ziyaretinde tazeleme yapan hafif
+   yaklaşımı kalıcı çözüm. Bu madde kapandı, ayrı bir iş kalmadı.
 
 ## Veri Modeli (Kavramsal Taslak)
 
@@ -512,10 +560,43 @@ bir iş kalmadı.
   onun yerine `/kullanicilar` ekranındaki "Yeni Kullanıcı" formu
   kullanılır (yöneticinin oturumunu bozmadan `UserManager.CreateAsync` +
   `AddToRoleAsync` ile doğrudan hesap açar).
-- `/kullanicilar` (Yönetici-only): kullanıcı listesi (E-posta, Rol,
-  Durum) + tek bir form hem **yeni kullanıcı oluşturma** hem **düzenleme**
-  için kullanılır (diğer ekranlarla aynı desen): "Düzenle" butonu formu
-  o kullanıcının Email'i (salt okunur), Rol ve Aktif değerleriyle açar.
+- **Kullanıcı Adı / Ad Soyad ayrımı (2026-08-11)**: `ApplicationUser`'a
+  `Name` (Ad Soyad, nullable, migration ile eklendi) eklendi. Artık
+  `UserName` (giriş için) ve `Email` (yalnızca iletişim bilgisi, artık
+  girişte kullanılmıyor) birbirinden bağımsız — önceden `UserName`
+  her zaman `Email` ile zorunlu aynıydı. **Giriş ekranı** (`Login.razor`)
+  artık "E-posta" değil **"Kullanıcı Adı"** ile çalışıyor
+  (`SignInManager.PasswordSignInAsync(Input.KullaniciAdi, ...)` —
+  bu API zaten her zaman UserName'e göre arıyordu, önceden UserName=Email
+  olduğu için email gibi görünüyordu). Mevcut (eski) kullanıcılara
+  dokunulmadı — onların `UserName`'i hâlâ email formatında, girişte
+  aynı şekilde yazmaya devam ederler; `Name` alanları boş, isteyen
+  Düzenle ile sonradan doldurur. Audit alanları (Kaydeden/Guncelleyen)
+  `Identity.Name` → `UserName`'den geldiği için bu değişiklikten
+  etkilenmedi (davranış aynı, sadece artık UserName email olmak zorunda
+  değil). Gerçek DB'ye karşı scratch script'le uçtan uca doğrulandı
+  (oluşturma, kullanıcı adıyla arama/şifre kontrolü, email'in artık
+  kullanıcı adı yerine geçmediği, düzenleme sonrası UserName'in sabit
+  kaldığı).
+- **E-posta bilerek tekil değil (2026-08-11)**: Birden fazla kullanıcı
+  aynı e-postayı paylaşabilir (örn. bir ekibin ortak e-postasıyla farklı
+  Kullanıcı Adı'na sahip birkaç hesabı olması — gerçek kullanım deseni).
+  Bu yüzden `Program.cs`'teki ilk yönetici kontrolü `FindByEmailAsync`
+  (tekil sonuç bekler, birden fazla eşleşmede istisna fırlatır ve
+  **uygulamayı başlangıçta çökertir**) yerine `FindByNameAsync`
+  kullanır — `UserName` Identity tarafından zaten tekil garanti edilir.
+  Aynı sebeple kullanılmayan `RegisterConfirmation.razor`'daki
+  `FindByEmailAsync` çağrısı da `NormalizeEmail` + `FirstOrDefaultAsync`
+  ile dayanıklı hale getirildi. `ForgotPassword`, `ResetPassword` (+
+  onay sayfaları) ve `ResendEmailConfirmation` sayfaları — zaten hiçbir
+  yerden linklenmiyordu ve e-posta gönderimi no-op olduğu için işlevsel
+  değillerdi — bu aynı riski taşıdıkları için tamamen silindi. Gerçek
+  DB'ye karşı (paylaşılan e-postalı gerçek kayıtlarla) doğrulandı.
+- `/kullanicilar` (Yönetici-only): kullanıcı listesi (Kullanıcı Adı, Ad
+  Soyad, Rol, Durum) + tek bir form hem **yeni kullanıcı oluşturma** hem
+  **düzenleme** için kullanılır (diğer ekranlarla aynı desen): "Düzenle"
+  butonu formu o kullanıcının Kullanıcı Adı'yla (salt okunur, değişmez),
+  Ad Soyad, E-posta, Rol ve Aktif değerleriyle açar.
   **Aktif/Pasif** (2026-08-06) şema değişikliği gerektirmeden ASP.NET
   Core Identity'nin hazır lockout mekanizmasıyla uygulandı:
   `UserManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue)` →
