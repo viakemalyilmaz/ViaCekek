@@ -1,0 +1,485 @@
+@page "/rapor"
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using ViaCekek.Web.Data
+@using ViaCekek.Web.Models
+@using ClosedXML.Excel
+@using CekekTakipKaydi = ViaCekek.Web.Models.CekekTakip
+@inject ApplicationDbContext Db
+@inject IJSRuntime JS
+
+<PageTitle>Çekek Takip Raporu</PageTitle>
+
+<h3>Çekek Takip Raporu</h3>
+
+<div class="card card-body mb-3">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Kimlik No / Takip No</label>
+            <div class="input-group">
+                <select class="form-select" style="max-width: 140px;" @bind="kimlikTakipFiltre.Operator">
+                    <option value="@MetinOperatoru.Icerir">İçerir</option>
+                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
+                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
+                </select>
+                <input class="form-control" @bind="kimlikTakipFiltre.Deger" />
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Ad Soyad</label>
+            <div class="input-group">
+                <select class="form-select" style="max-width: 140px;" @bind="adSoyadFiltre.Operator">
+                    <option value="@MetinOperatoru.Icerir">İçerir</option>
+                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
+                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
+                </select>
+                <input class="form-control" @bind="adSoyadFiltre.Deger" />
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Firma Adı</label>
+            <div class="input-group">
+                <select class="form-select" style="max-width: 140px;" @bind="firmaFiltre.Operator">
+                    <option value="@MetinOperatoru.Icerir">İçerir</option>
+                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
+                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
+                </select>
+                <input class="form-control" @bind="firmaFiltre.Deger" />
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Telefon</label>
+            <div class="input-group">
+                <select class="form-select" style="max-width: 140px;" @bind="telefonFiltre.Operator">
+                    <option value="@MetinOperatoru.Icerir">İçerir</option>
+                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
+                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
+                </select>
+                <input class="form-control" @bind="telefonFiltre.Deger" />
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Araç Türü</label>
+            <select class="form-select" @bind="aracTuruFiltre">
+                <option value="">Tümü</option>
+                <option value="@AracTuru.Arac">Araç</option>
+                <option value="@AracTuru.Vinc">Vinç</option>
+                <option value="@AracTuru.Vidanjor">Vidanjör</option>
+                <option value="@AracTuru.Kompresor">Kompresör</option>
+                <option value="@AracTuru.BasincliKap">Basınçlı Kap</option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Tekne</label>
+            <select class="form-select" @bind="tekneIdFiltre">
+                <option value="">Tümü</option>
+                @foreach (var tekne in tekneler)
+                {
+                    <option value="@tekne.Id">@tekne.TekneKodu — @tekne.TekneAdi</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Ziyaret Sebebi</label>
+            <select class="form-select" @bind="ziyaretSebebiFiltre">
+                <option value="">Tümü</option>
+                @foreach (var sebep in ziyaretSebepleri)
+                {
+                    <option value="@sebep">@ZiyaretSebebiAdi(sebep)</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Durum</label>
+            <select class="form-select" @bind="durumFiltre">
+                <option value="">Tümü</option>
+                <option value="@CekekTakipDurumu.GirisYapildi">Giriş Yapıldı</option>
+                <option value="@CekekTakipDurumu.ZamanAsimi">Süresi Geçti</option>
+                <option value="@CekekTakipDurumu.CikisYapildi">Çıkış Yapıldı</option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Açıklama</label>
+            <div class="input-group">
+                <select class="form-select" style="max-width: 140px;" @bind="aciklamaFiltre.Operator">
+                    <option value="@MetinOperatoru.Icerir">İçerir</option>
+                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
+                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
+                </select>
+                <input class="form-control" @bind="aciklamaFiltre.Deger" />
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Giriş Tarihi</label>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+                <select class="form-select" style="max-width: 130px;" @bind="girisTarihiFiltre.Operator">
+                    <option value="@TarihOperatoru.Once">Öncesi</option>
+                    <option value="@TarihOperatoru.Sonra">Sonrası</option>
+                    <option value="@TarihOperatoru.Esittir">Eşittir</option>
+                    <option value="@TarihOperatoru.Arasi">Arası</option>
+                </select>
+                <input type="date" class="form-control" style="max-width: 170px;" @bind="girisTarihiFiltre.Tarih1" />
+                @if (girisTarihiFiltre.Operator == TarihOperatoru.Arasi)
+                {
+                    <span>—</span>
+                    <input type="date" class="form-control" style="max-width: 170px;" @bind="girisTarihiFiltre.Tarih2" />
+                }
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Çıkış Tarihi</label>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+                <select class="form-select" style="max-width: 130px;" @bind="cikisTarihiFiltre.Operator">
+                    <option value="@TarihOperatoru.Once">Öncesi</option>
+                    <option value="@TarihOperatoru.Sonra">Sonrası</option>
+                    <option value="@TarihOperatoru.Esittir">Eşittir</option>
+                    <option value="@TarihOperatoru.Arasi">Arası</option>
+                </select>
+                <input type="date" class="form-control" style="max-width: 170px;" @bind="cikisTarihiFiltre.Tarih1" />
+                @if (cikisTarihiFiltre.Operator == TarihOperatoru.Arasi)
+                {
+                    <span>—</span>
+                    <input type="date" class="form-control" style="max-width: 170px;" @bind="cikisTarihiFiltre.Tarih2" />
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <button class="btn btn-lg btn-primary" @onclick="Filtrele">Filtrele</button>
+        <button class="btn btn-lg btn-secondary" @onclick="FiltreleriTemizle">Temizle</button>
+        <button class="btn btn-lg btn-success" @onclick="ExcelAktar" disabled="@(sonuclar is null || sonuclar.Count == 0)">Excel'e Aktar</button>
+    </div>
+</div>
+
+@if (sonuclar is null)
+{
+    <p>Filtrelemek için "Filtrele"ye basın.</p>
+}
+else if (sonuclar.Count == 0)
+{
+    <p>Sonuç bulunamadı.</p>
+}
+else
+{
+    <p>@sonuclar.Count kayıt bulundu.</p>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Kimlik/Takip No</th>
+                    <th>Ad Soyad</th>
+                    <th>Firma</th>
+                    <th>Telefon</th>
+                    <th>Araç Türü</th>
+                    <th>Tekne</th>
+                    <th>Ziyaret Sebebi</th>
+                    <th>Giriş</th>
+                    <th>Çıkış</th>
+                    <th>Durum</th>
+                    <th>Açıklama</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var kayit in sonuclar)
+                {
+                    <tr>
+                        <td>@(kayit.KimlikNumarasi ?? kayit.TakipNumarasi)</td>
+                        <td>@kayit.AdSoyad</td>
+                        <td>@kayit.FirmaAdi</td>
+                        <td>@kayit.Telefon</td>
+                        <td>@(kayit.Arac is not null ? AracTuruAdi(kayit.Arac.AracTuru) : "")</td>
+                        <td>@(kayit.Tekne is not null ? $"{kayit.Tekne.TekneKodu} — {kayit.Tekne.TekneAdi}" : "")</td>
+                        <td>@ZiyaretSebebiAdi(kayit.ZiyaretSebebi)</td>
+                        <td>@GirisMetni(kayit)</td>
+                        <td>@CikisMetni(kayit)</td>
+                        <td>@DurumAdi(kayit.Durum)</td>
+                        <td>@kayit.Aciklama</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private enum MetinOperatoru { Icerir, Esittir, BaslarIle }
+    private enum TarihOperatoru { Once, Sonra, Esittir, Arasi }
+
+    private sealed class MetinFiltre
+    {
+        public MetinOperatoru Operator { get; set; } = MetinOperatoru.Icerir;
+        public string Deger { get; set; } = string.Empty;
+    }
+
+    private sealed class TarihFiltre
+    {
+        public TarihOperatoru Operator { get; set; } = TarihOperatoru.Once;
+        public DateOnly? Tarih1 { get; set; }
+        public DateOnly? Tarih2 { get; set; }
+    }
+
+    private static readonly ZiyaretSebebi[] ziyaretSebepleri =
+    [
+        ZiyaretSebebi.Calisma,
+        ZiyaretSebebi.Gorusme,
+        ZiyaretSebebi.Kesif,
+        ZiyaretSebebi.Kontrol,
+        ZiyaretSebebi.MalzemeAlma,
+        ZiyaretSebebi.MalzemeBirakma,
+        ZiyaretSebebi.IskeleKurma
+    ];
+
+    private MetinFiltre kimlikTakipFiltre = new();
+    private MetinFiltre adSoyadFiltre = new();
+    private MetinFiltre firmaFiltre = new();
+    private MetinFiltre telefonFiltre = new();
+    private MetinFiltre aciklamaFiltre = new();
+    private TarihFiltre girisTarihiFiltre = new() { Operator = TarihOperatoru.Esittir, Tarih1 = DateOnly.FromDateTime(DateTime.Now) };
+    private TarihFiltre cikisTarihiFiltre = new();
+    private AracTuru? aracTuruFiltre;
+    private int? tekneIdFiltre;
+    private ZiyaretSebebi? ziyaretSebebiFiltre;
+    private CekekTakipDurumu? durumFiltre;
+
+    private List<Tekne> tekneler = [];
+    private List<CekekTakipKaydi>? sonuclar;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tekneler = await Db.Tekneler.AsNoTracking().OrderBy(t => t.TekneKodu).ToListAsync();
+        await Filtrele();
+    }
+
+    private static string ZiyaretSebebiAdi(ZiyaretSebebi sebep) => sebep switch
+    {
+        ZiyaretSebebi.Calisma => "Çalışma",
+        ZiyaretSebebi.Gorusme => "Görüşme",
+        ZiyaretSebebi.Kesif => "Keşif",
+        ZiyaretSebebi.Kontrol => "Kontrol",
+        ZiyaretSebebi.MalzemeAlma => "Malzeme Alma",
+        ZiyaretSebebi.MalzemeBirakma => "Malzeme Bırakma",
+        ZiyaretSebebi.IskeleKurma => "İskele Kurma",
+        _ => sebep.ToString()
+    };
+
+    private static string AracTuruAdi(AracTuru tur) => tur switch
+    {
+        AracTuru.Arac => "Araç",
+        AracTuru.Vinc => "Vinç",
+        AracTuru.Vidanjor => "Vidanjör",
+        AracTuru.Kompresor => "Kompresör",
+        AracTuru.BasincliKap => "Basınçlı Kap",
+        _ => tur.ToString()
+    };
+
+    private static string DurumAdi(CekekTakipDurumu durum) => durum switch
+    {
+        CekekTakipDurumu.GirisYapildi => "Giriş Yapıldı",
+        CekekTakipDurumu.ZamanAsimi => "Süresi Geçti",
+        CekekTakipDurumu.CikisYapildi => "Çıkış Yapıldı",
+        _ => durum.ToString()
+    };
+
+    private static string GirisMetni(CekekTakipKaydi kayit) =>
+        kayit.GirisTarihi is { } t && kayit.GirisSaati is { } s ? $"{t:dd.MM.yyyy} {s:HH:mm}" : "";
+
+    private static string CikisMetni(CekekTakipKaydi kayit) =>
+        kayit.CikisTarihi is { } t && kayit.CikisSaati is { } s ? $"{t:dd.MM.yyyy} {s:HH:mm}" : "";
+
+    private async Task Filtrele()
+    {
+        var sorgu = Db.CekekTakipleri
+            .AsNoTracking()
+            .Include(c => c.Arac)
+            .Include(c => c.Tekne)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(kimlikTakipFiltre.Deger))
+        {
+            var deger = kimlikTakipFiltre.Deger.Trim();
+            sorgu = kimlikTakipFiltre.Operator switch
+            {
+                MetinOperatoru.Esittir => sorgu.Where(c => c.KimlikNumarasi == deger || c.TakipNumarasi == deger),
+                MetinOperatoru.BaslarIle => sorgu.Where(c =>
+                    (c.KimlikNumarasi != null && c.KimlikNumarasi.StartsWith(deger)) ||
+                    (c.TakipNumarasi != null && c.TakipNumarasi.StartsWith(deger))),
+                _ => sorgu.Where(c =>
+                    (c.KimlikNumarasi != null && c.KimlikNumarasi.Contains(deger)) ||
+                    (c.TakipNumarasi != null && c.TakipNumarasi.Contains(deger)))
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(adSoyadFiltre.Deger))
+        {
+            var deger = adSoyadFiltre.Deger.Trim();
+            sorgu = adSoyadFiltre.Operator switch
+            {
+                MetinOperatoru.Esittir => sorgu.Where(c => c.AdSoyad == deger),
+                MetinOperatoru.BaslarIle => sorgu.Where(c => c.AdSoyad != null && c.AdSoyad.StartsWith(deger)),
+                _ => sorgu.Where(c => c.AdSoyad != null && c.AdSoyad.Contains(deger))
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(firmaFiltre.Deger))
+        {
+            var deger = firmaFiltre.Deger.Trim();
+            sorgu = firmaFiltre.Operator switch
+            {
+                MetinOperatoru.Esittir => sorgu.Where(c => c.FirmaAdi == deger),
+                MetinOperatoru.BaslarIle => sorgu.Where(c => c.FirmaAdi != null && c.FirmaAdi.StartsWith(deger)),
+                _ => sorgu.Where(c => c.FirmaAdi != null && c.FirmaAdi.Contains(deger))
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(telefonFiltre.Deger))
+        {
+            var deger = telefonFiltre.Deger.Trim();
+            sorgu = telefonFiltre.Operator switch
+            {
+                MetinOperatoru.Esittir => sorgu.Where(c => c.Telefon == deger),
+                MetinOperatoru.BaslarIle => sorgu.Where(c => c.Telefon != null && c.Telefon.StartsWith(deger)),
+                _ => sorgu.Where(c => c.Telefon != null && c.Telefon.Contains(deger))
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(aciklamaFiltre.Deger))
+        {
+            var deger = aciklamaFiltre.Deger.Trim();
+            sorgu = aciklamaFiltre.Operator switch
+            {
+                MetinOperatoru.Esittir => sorgu.Where(c => c.Aciklama == deger),
+                MetinOperatoru.BaslarIle => sorgu.Where(c => c.Aciklama != null && c.Aciklama.StartsWith(deger)),
+                _ => sorgu.Where(c => c.Aciklama != null && c.Aciklama.Contains(deger))
+            };
+        }
+
+        if (aracTuruFiltre is not null)
+        {
+            sorgu = sorgu.Where(c => c.Arac != null && c.Arac.AracTuru == aracTuruFiltre);
+        }
+
+        if (tekneIdFiltre is not null)
+        {
+            sorgu = sorgu.Where(c => c.TekneId == tekneIdFiltre);
+        }
+
+        if (ziyaretSebebiFiltre is not null)
+        {
+            sorgu = sorgu.Where(c => c.ZiyaretSebebi == ziyaretSebebiFiltre);
+        }
+
+        if (durumFiltre is not null)
+        {
+            sorgu = sorgu.Where(c => c.Durum == durumFiltre);
+        }
+
+        if (girisTarihiFiltre.Tarih1 is not null)
+        {
+            sorgu = girisTarihiFiltre.Operator switch
+            {
+                TarihOperatoru.Once => sorgu.Where(c => c.GirisTarihi != null && c.GirisTarihi < girisTarihiFiltre.Tarih1),
+                TarihOperatoru.Sonra => sorgu.Where(c => c.GirisTarihi != null && c.GirisTarihi > girisTarihiFiltre.Tarih1),
+                TarihOperatoru.Esittir => sorgu.Where(c => c.GirisTarihi == girisTarihiFiltre.Tarih1),
+                TarihOperatoru.Arasi when girisTarihiFiltre.Tarih2 is not null =>
+                    sorgu.Where(c => c.GirisTarihi != null && c.GirisTarihi >= girisTarihiFiltre.Tarih1 && c.GirisTarihi <= girisTarihiFiltre.Tarih2),
+                _ => sorgu
+            };
+        }
+
+        if (cikisTarihiFiltre.Tarih1 is not null)
+        {
+            sorgu = cikisTarihiFiltre.Operator switch
+            {
+                TarihOperatoru.Once => sorgu.Where(c => c.CikisTarihi != null && c.CikisTarihi < cikisTarihiFiltre.Tarih1),
+                TarihOperatoru.Sonra => sorgu.Where(c => c.CikisTarihi != null && c.CikisTarihi > cikisTarihiFiltre.Tarih1),
+                TarihOperatoru.Esittir => sorgu.Where(c => c.CikisTarihi == cikisTarihiFiltre.Tarih1),
+                TarihOperatoru.Arasi when cikisTarihiFiltre.Tarih2 is not null =>
+                    sorgu.Where(c => c.CikisTarihi != null && c.CikisTarihi >= cikisTarihiFiltre.Tarih1 && c.CikisTarihi <= cikisTarihiFiltre.Tarih2),
+                _ => sorgu
+            };
+        }
+
+        sonuclar = await sorgu
+            .OrderByDescending(c => c.GirisTarihi)
+            .ThenByDescending(c => c.GirisSaati)
+            .ToListAsync();
+    }
+
+    private void FiltreleriTemizle()
+    {
+        kimlikTakipFiltre = new();
+        adSoyadFiltre = new();
+        firmaFiltre = new();
+        telefonFiltre = new();
+        aciklamaFiltre = new();
+        girisTarihiFiltre = new();
+        cikisTarihiFiltre = new();
+        aracTuruFiltre = null;
+        tekneIdFiltre = null;
+        ziyaretSebebiFiltre = null;
+        durumFiltre = null;
+        sonuclar = null;
+    }
+
+    private async Task ExcelAktar()
+    {
+        if (sonuclar is null || sonuclar.Count == 0)
+        {
+            return;
+        }
+
+        using var workbook = new XLWorkbook();
+        var sayfa = workbook.Worksheets.Add("Rapor");
+
+        string[] basliklar =
+        [
+            "Kimlik/Takip No", "Ad Soyad", "Firma Adı", "Telefon", "Araç Türü",
+            "Tekne", "Ziyaret Sebebi", "Giriş", "Çıkış", "Durum", "Açıklama"
+        ];
+        for (var i = 0; i < basliklar.Length; i++)
+        {
+            sayfa.Cell(1, i + 1).Value = basliklar[i];
+            sayfa.Cell(1, i + 1).Style.Font.Bold = true;
+        }
+
+        var satir = 2;
+        foreach (var kayit in sonuclar)
+        {
+            sayfa.Cell(satir, 1).Value = kayit.KimlikNumarasi ?? kayit.TakipNumarasi ?? string.Empty;
+            sayfa.Cell(satir, 2).Value = kayit.AdSoyad ?? string.Empty;
+            sayfa.Cell(satir, 3).Value = kayit.FirmaAdi ?? string.Empty;
+            sayfa.Cell(satir, 4).Value = kayit.Telefon ?? string.Empty;
+            sayfa.Cell(satir, 5).Value = kayit.Arac is not null ? AracTuruAdi(kayit.Arac.AracTuru) : string.Empty;
+            sayfa.Cell(satir, 6).Value = kayit.Tekne is not null ? $"{kayit.Tekne.TekneKodu} — {kayit.Tekne.TekneAdi}" : string.Empty;
+            sayfa.Cell(satir, 7).Value = ZiyaretSebebiAdi(kayit.ZiyaretSebebi);
+            sayfa.Cell(satir, 8).Value = GirisMetni(kayit);
+            sayfa.Cell(satir, 9).Value = CikisMetni(kayit);
+            sayfa.Cell(satir, 10).Value = DurumAdi(kayit.Durum);
+            sayfa.Cell(satir, 11).Value = kayit.Aciklama ?? string.Empty;
+            satir++;
+        }
+
+        sayfa.Columns().AdjustToContents();
+
+        using var akis = new MemoryStream();
+        workbook.SaveAs(akis);
+        var base64 = Convert.ToBase64String(akis.ToArray());
+
+        var dosyaAdi = $"CekekTakipRaporu_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+        await JS.InvokeVoidAsync("dosyaIndir", dosyaAdi, base64,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
