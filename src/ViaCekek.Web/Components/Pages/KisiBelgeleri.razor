@@ -1,6 +1,6 @@
 @page "/kisibelgeleri"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data

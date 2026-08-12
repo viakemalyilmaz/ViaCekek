@@ -61,7 +61,7 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    var ilkYonetici = await userManager.FindByEmailAsync("kemalyilmaz@viadmc.com");
+    var ilkYonetici = await userManager.FindByNameAsync("kemalyilmaz@viadmc.com");
     if (ilkYonetici is not null && !await userManager.IsInRoleAsync(ilkYonetici, Roller.Yonetici))
     {
         await userManager.AddToRoleAsync(ilkYonetici, Roller.Yonetici);

@@ -3,6 +3,7 @@
 @using System.Text
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 
 @inject UserManager<ApplicationUser> UserManager
@@ -48,7 +49,11 @@ else
             RedirectManager.RedirectTo("");
         }
 
-        var user = await UserManager.FindByEmailAsync(Email);
+        // FindByEmailAsync tekil sonuç bekler; bu projede e-posta tekil
+        // değil (bkz. CLAUDE.md > Kullanıcı Yönetimi) — birden fazla
+        // eşleşme olabileceğinden ilkini almak yeterli.
+        var normalizedEmail = UserManager.NormalizeEmail(Email);
+        var user = await UserManager.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;

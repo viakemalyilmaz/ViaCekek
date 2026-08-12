@@ -1,6 +1,6 @@
 @page "/cekektakip"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data

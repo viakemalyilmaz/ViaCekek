@@ -22,9 +22,9 @@
                 <hr />
                 <ValidationSummary class="text-danger" role="alert" />
                 <div class="form-floating mb-3">
-                    <InputText @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="eposta@viadmc.com" />
-                    <label for="email" class="form-label">E-posta</label>
-                    <ValidationMessage For="() => Input.Email" class="text-danger" />
+                    <InputText @bind-Value="Input.KullaniciAdi" class="form-control" autocomplete="username" aria-required="true" placeholder="kullanıcı adı" />
+                    <label for="kullaniciAdi" class="form-label">Kullanıcı Adı</label>
+                    <ValidationMessage For="() => Input.KullaniciAdi" class="text-danger" />
                 </div>
                 <div class="form-floating mb-3">
                     <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="şifre" />
@@ -73,7 +73,7 @@
     {
         // This doesn't count login failures towards account lockout
         // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        var result = await SignInManager.PasswordSignInAsync(Input.KullaniciAdi, Input.Password, Input.RememberMe, lockoutOnFailure: false);
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
@@ -99,8 +99,7 @@
     private sealed class InputModel
     {
         [Required]
-        [EmailAddress]
-        public string Email { get; set; } = "";
+        public string KullaniciAdi { get; set; } = "";
 
         [Required]
         [DataType(DataType.Password)]

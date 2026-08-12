@@ -1,6 +1,10 @@
+@using Microsoft.AspNetCore.Identity
+@using ViaCekek.Web.Data
+@inject UserManager<ApplicationUser> UserManager
+
 <AuthorizeView>
     <Authorized>
-        <span class="navbar-text me-3">@context.User.Identity?.Name</span>
+        <span class="navbar-text me-3">@gosterilecekAd</span>
         <form action="Account/Logout" method="post">
             <AntiforgeryToken />
             <input type="hidden" name="returnUrl" value="" />
@@ -11,3 +15,24 @@
         <a class="btn btn-outline-light btn-sm" href="Account/Login">Giriş Yap</a>
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    [CascadingParameter]
+    private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private string? gosterilecekAd;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        var kullanici = await UserManager.GetUserAsync(authState.User);
+        gosterilecekAd = !string.IsNullOrWhiteSpace(kullanici?.Name)
+            ? kullanici.Name
+            : authState.User.Identity?.Name;
+    }
+}
