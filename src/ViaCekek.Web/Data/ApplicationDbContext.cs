@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ViaCekek.Web.Models;
@@ -7,9 +6,17 @@ using ViaCekek.Web.Models.Common;
 namespace ViaCekek.Web.Data;
 
 public class ApplicationDbContext(
-    DbContextOptions<ApplicationDbContext> options,
-    AuthenticationStateProvider authenticationStateProvider) : IdentityDbContext<ApplicationUser>(options)
+    DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
+    // IDbContextFactory ile üretilen (sayfa başına kısa ömürlü) instance'larda
+    // kaydeden/güncelleyen kullanıcı adı, DbContext oluşturulduktan hemen sonra
+    // çağıran sayfa tarafından buraya yazılır (AuthenticationStateProvider artık
+    // constructor'a enjekte edilmiyor — factory'nin Singleton olması ile
+    // AuthenticationStateProvider'ın Scoped olması arasındaki çakışmayı ortadan
+    // kaldırmak için, bkz. CLAUDE.md > prerender/IDbContextFactory notu).
+    public string? MevcutKullanici { get; set; }
+
+
     public DbSet<Tekne> Tekneler => Set<Tekne>();
     public DbSet<Kisi> Kisiler => Set<Kisi>();
     public DbSet<Arac> Araclar => Set<Arac>();
@@ -117,28 +124,24 @@ public class ApplicationDbContext(
             .OnDelete(DeleteBehavior.SetNull);
     }
 
-    // Blazor Server interactive circuit'lerde HttpContext güvenilir olmadığından
-    // (SignalR bağlantısı kurulduktan sonra ilk isteğe ait HttpContext elden çıkar),
-    // audit alanları yalnızca asenkron yolda, AuthenticationStateProvider üzerinden
-    // doldurulur. Senkron SaveChanges bilerek desteklenmiyor.
+    // Tutarlılık için senkron SaveChanges hâlâ desteklenmiyor (audit alanları
+    // her zaman SaveChangesAsync üzerinden doldurulmalı — çağıran sayfa
+    // MevcutKullanici'yi context oluşturulduktan sonra, kaydetmeden önce set eder).
     public override int SaveChanges()
-        => throw new InvalidOperationException(
-            "SaveChanges yerine SaveChangesAsync kullanın: audit alanları (Kaydeden/Güncelleyen) " +
-            "yalnızca asenkron AuthenticationStateProvider çağrısıyla güvenilir şekilde doldurulabilir.");
+        => throw new InvalidOperationException("SaveChanges yerine SaveChangesAsync kullanın.");
 
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await UygulaAuditBilgisiAsync();
-        return await base.SaveChangesAsync(cancellationToken);
+        UygulaAuditBilgisi();
+        return base.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task UygulaAuditBilgisiAsync()
+    private void UygulaAuditBilgisi()
     {
         if (!ChangeTracker.Entries<AuditableEntity>().Any(e => e.State is EntityState.Added or EntityState.Modified))
             return;
 
-        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
-        var kullanici = authState.User?.Identity?.Name ?? "system";
+        var kullanici = MevcutKullanici ?? "system";
         var simdi = DateTime.Now;
 
         foreach (var entry in ChangeTracker.Entries<AuditableEntity>())

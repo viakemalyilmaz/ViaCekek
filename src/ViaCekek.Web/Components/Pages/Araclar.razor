@@ -1,12 +1,13 @@
 @page "/araclar"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
 @using ViaCekek.Web.Models.Common
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Araç Tanımları</PageTitle>
 
@@ -314,10 +315,17 @@ else
         }
     }
 
+    private async Task<string?> AktifKullaniciAdi()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return authState.User?.Identity?.Name;
+    }
+
     private async Task ListeyiYenile()
     {
-        araclar = await Db.Araclar.OrderBy(a => a.TakipNumarasi).ToListAsync();
-        firmaOnerileri = await Db.Araclar
+        await using var db = await DbFactory.CreateDbContextAsync();
+        araclar = await db.Araclar.OrderBy(a => a.TakipNumarasi).ToListAsync();
+        firmaOnerileri = await db.Araclar
             .Where(a => a.FirmaAdi != null && a.FirmaAdi != "")
             .Select(a => a.FirmaAdi!)
             .Distinct()
@@ -376,7 +384,8 @@ else
 
     private async Task BelgeDurumlariniYukle(int? aracId, AracTuru aracTuru)
     {
-        IQueryable<AracBelge> sorgu = Db.AracBelgeleri.Where(b => b.Aktif);
+        await using var db = await DbFactory.CreateDbContextAsync();
+        IQueryable<AracBelge> sorgu = db.AracBelgeleri.Where(b => b.Aktif);
         sorgu = aracTuru switch
         {
             AracTuru.Arac => sorgu.Where(b => b.GecerliArac),
@@ -389,7 +398,7 @@ else
         var kurallar = await sorgu.OrderBy(b => b.BelgeTanimi).ToListAsync();
 
         var mevcutDurumlar = aracId is int id
-            ? await Db.AracBelgeKontrolleri.Where(k => k.AracId == id).ToListAsync()
+            ? await db.AracBelgeKontrolleri.Where(k => k.AracId == id).ToListAsync()
             : [];
 
         belgeDurumSatirlari = kurallar.Select(kural =>
@@ -420,17 +429,19 @@ else
 
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
             Arac arac;
             var yeniKayit = duzenlenenArac.Id == 0;
 
             if (yeniKayit)
             {
                 arac = duzenlenenArac;
-                Db.Araclar.Add(arac);
+                db.Araclar.Add(arac);
             }
             else
             {
-                var mevcut = await Db.Araclar.FindAsync(duzenlenenArac.Id);
+                var mevcut = await db.Araclar.FindAsync(duzenlenenArac.Id);
                 if (mevcut is null)
                 {
                     hataMesaji = "Kayıt bulunamadı, sayfayı yenileyin.";
@@ -459,7 +470,7 @@ else
 
                     var mevcutKontrol = yeniKayit
                         ? null
-                        : await Db.AracBelgeKontrolleri
+                        : await db.AracBelgeKontrolleri
                             .FirstOrDefaultAsync(k => k.AracId == arac.Id && k.AracBelgeId == satir.Belge.Id);
 
                     if (mevcutKontrol is null)
@@ -483,7 +494,7 @@ else
                             yeniKontrol.AracId = arac.Id;
                         }
 
-                        Db.AracBelgeKontrolleri.Add(yeniKontrol);
+                        db.AracBelgeKontrolleri.Add(yeniKontrol);
                     }
                     else
                     {
@@ -493,7 +504,8 @@ else
                 }
             }
 
-            await Db.SaveChangesAsync();
+            db.MevcutKullanici = await AktifKullaniciAdi();
+            await db.SaveChangesAsync();
             await ListeyiYenile();
 
             basariUyariMi = uyariBelgeleri.Count > 0;

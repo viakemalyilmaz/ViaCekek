@@ -1,12 +1,13 @@
 @page "/kisiler"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
 @using ViaCekek.Web.Models.Common
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Kişi Tanımları</PageTitle>
 
@@ -359,10 +360,17 @@ else
         }
     }
 
+    private async Task<string?> AktifKullaniciAdi()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return authState.User?.Identity?.Name;
+    }
+
     private async Task ListeyiYenile()
     {
-        kisiler = await Db.Kisiler.OrderBy(k => k.AdSoyad).ToListAsync();
-        firmaOnerileri = await Db.Kisiler
+        await using var db = await DbFactory.CreateDbContextAsync();
+        kisiler = await db.Kisiler.OrderBy(k => k.AdSoyad).ToListAsync();
+        firmaOnerileri = await db.Kisiler
             .Where(k => k.FirmaAdi != null && k.FirmaAdi != "")
             .Select(k => k.FirmaAdi!)
             .Distinct()
@@ -412,13 +420,14 @@ else
 
     private async Task BelgeDurumlariniYukle(int? kisiId)
     {
-        var kurallar = await Db.KisiBelgeleri
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var kurallar = await db.KisiBelgeleri
             .Where(b => b.Aktif)
             .OrderBy(b => b.BelgeTanimi)
             .ToListAsync();
 
         var mevcutDurumlar = kisiId is int id
-            ? await Db.KisiBelgeKontrolleri.Where(k => k.KisiId == id).ToListAsync()
+            ? await db.KisiBelgeKontrolleri.Where(k => k.KisiId == id).ToListAsync()
             : [];
 
         belgeDurumSatirlari = kurallar.Select(kural =>
@@ -454,17 +463,19 @@ else
 
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
             Kisi kisi;
             var yeniKayit = duzenlenenKisi.Id == 0;
 
             if (yeniKayit)
             {
                 kisi = duzenlenenKisi;
-                Db.Kisiler.Add(kisi);
+                db.Kisiler.Add(kisi);
             }
             else
             {
-                var mevcut = await Db.Kisiler.FindAsync(duzenlenenKisi.Id);
+                var mevcut = await db.Kisiler.FindAsync(duzenlenenKisi.Id);
                 if (mevcut is null)
                 {
                     hataMesaji = "Kayıt bulunamadı, sayfayı yenileyin.";
@@ -500,7 +511,7 @@ else
 
                     var mevcutKontrol = yeniKayit
                         ? null
-                        : await Db.KisiBelgeKontrolleri
+                        : await db.KisiBelgeKontrolleri
                             .FirstOrDefaultAsync(k => k.KisiId == kisi.Id && k.KisiBelgeId == satir.Belge.Id);
 
                     if (mevcutKontrol is null)
@@ -524,7 +535,7 @@ else
                             yeniKontrol.KisiId = kisi.Id;
                         }
 
-                        Db.KisiBelgeKontrolleri.Add(yeniKontrol);
+                        db.KisiBelgeKontrolleri.Add(yeniKontrol);
                     }
                     else
                     {
@@ -534,7 +545,8 @@ else
                 }
             }
 
-            await Db.SaveChangesAsync();
+            db.MevcutKullanici = await AktifKullaniciAdi();
+            await db.SaveChangesAsync();
             await ListeyiYenile();
 
             basariUyariMi = uyariBelgeleri.Count > 0;

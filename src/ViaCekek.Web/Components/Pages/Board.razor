@@ -1,15 +1,13 @@
 @page "/"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
-@* prerender:false bilerek — ana sayfa olduğu için prerender + interaktif
-   circuit'in OnInitializedAsync'i aynı DbContext üzerinde çakışarak iki
-   kez tetiklemesi "concurrent DbContext" hatasına sebep oluyordu. *@
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
 @using CekekTakipKaydi = ViaCekek.Web.Models.CekekTakip
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Çekek Board</PageTitle>
 
@@ -110,13 +108,21 @@ else
         await ListeyiYenile();
     }
 
+    private async Task<string?> AktifKullaniciAdi()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return authState.User?.Identity?.Name;
+    }
+
     private async Task ListeyiYenile()
     {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
         // Board her ziyaret edildiğinde, süresi geçmiş ama hâlâ GirisYapildi
         // olan kayıtlar ZamanAsimi'ye çevrilir (gerçek zamanlayıcı henüz
         // yok, bkz. CLAUDE.md > Zamanlayıcı — bilerek hafif tutuldu).
         var simdi = DateTime.Now;
-        var suresiGecenler = await Db.CekekTakipleri
+        var suresiGecenler = await db.CekekTakipleri
             .Where(c => c.Durum == CekekTakipDurumu.GirisYapildi && c.BeklenenBitisZamani != null && c.BeklenenBitisZamani < simdi)
             .ToListAsync();
         foreach (var kayit in suresiGecenler)
@@ -125,10 +131,11 @@ else
         }
         if (suresiGecenler.Count > 0)
         {
-            await Db.SaveChangesAsync();
+            db.MevcutKullanici = await AktifKullaniciAdi();
+            await db.SaveChangesAsync();
         }
 
-        var liste = await Db.CekekTakipleri
+        var liste = await db.CekekTakipleri
             .AsNoTracking()
             .Include(c => c.Arac)
             .Include(c => c.Tekne)
@@ -240,7 +247,8 @@ else
 
     private async Task CikisYap(int id)
     {
-        var kayit = await Db.CekekTakipleri.FindAsync(id);
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var kayit = await db.CekekTakipleri.FindAsync(id);
         if (kayit is null)
         {
             return;
@@ -250,14 +258,16 @@ else
         kayit.CikisTarihi = DateOnly.FromDateTime(simdi);
         kayit.CikisSaati = TimeOnly.FromDateTime(simdi);
         kayit.Durum = CekekTakipDurumu.CikisYapildi;
-        await Db.SaveChangesAsync();
+        db.MevcutKullanici = await AktifKullaniciAdi();
+        await db.SaveChangesAsync();
 
         await ListeyiYenile();
     }
 
     private async Task SureUzat(int id)
     {
-        var kayit = await Db.CekekTakipleri.FindAsync(id);
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var kayit = await db.CekekTakipleri.FindAsync(id);
         if (kayit is null || kayit.BeklenenBitisZamani is null)
         {
             return;
@@ -268,7 +278,8 @@ else
         {
             kayit.Durum = CekekTakipDurumu.GirisYapildi;
         }
-        await Db.SaveChangesAsync();
+        db.MevcutKullanici = await AktifKullaniciAdi();
+        await db.SaveChangesAsync();
 
         await ListeyiYenile();
     }

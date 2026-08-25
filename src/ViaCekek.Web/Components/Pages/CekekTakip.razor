@@ -1,12 +1,13 @@
 @page "/cekektakip"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
 @using ViaCekek.Web.Models.Common
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Çekek Takip</PageTitle>
 
@@ -218,13 +219,26 @@ else if (asama == Asama.Onay)
 
         <div class="mb-3">
             <label class="form-label">Tekne</label>
-            <select class="form-select form-select-lg" style="max-width: 400px;" @bind="onayTekneId">
-                <option value="">— Seçilmedi —</option>
-                @foreach (var tekne in tekneler)
+            <div class="d-flex align-items-center gap-2" style="max-width: 400px;">
+                <input class="form-control form-control-lg"
+                       @bind:get="tekneArama" @bind:set="TekneAramaDegisti" @bind:event="oninput"
+                       autocomplete="off" placeholder="Tekne kodu veya adı ile ara..." />
+                @if (onayTekneId is not null)
                 {
-                    <option value="@tekne.Id">@tekne.TekneKodu — @tekne.TekneAdi</option>
+                    <button type="button" class="btn btn-outline-secondary btn-lg" @onclick="TekneSecimiTemizle">✕</button>
                 }
-            </select>
+            </div>
+            @if (eslesenTekneler.Count > 0)
+            {
+                <div class="list-group mt-1" style="max-width: 400px;">
+                    @foreach (var tekne in eslesenTekneler)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => TekneSec(tekne)">
+                            <strong>@tekne.TekneKodu</strong> — @tekne.TekneAdi
+                        </button>
+                    }
+                </div>
+            }
         </div>
 
         <div class="mb-3">
@@ -280,6 +294,8 @@ else if (asama == Asama.Onay)
     private string? onayFirmaAdi;
     private string? onayTelefon;
     private int? onayTekneId;
+    private string tekneArama = string.Empty;
+    private List<Tekne> eslesenTekneler = [];
     private string? onayAciklama;
     private List<string> yaklasanBelgeler = [];
 
@@ -287,9 +303,16 @@ else if (asama == Asama.Onay)
     private string? basariMesaji;
     private string? hataMesaji;
 
+    private async Task<string?> AktifKullaniciAdi()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return authState.User?.Identity?.Name;
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        tekneler = await Db.Tekneler.AsNoTracking().Where(t => t.Aktif).OrderBy(t => t.TekneKodu).ToListAsync();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        tekneler = await db.Tekneler.AsNoTracking().Where(t => t.Aktif).OrderBy(t => t.TekneKodu).ToListAsync();
     }
 
     private static string ZiyaretSebebiAdi(ZiyaretSebebi sebep) => sebep switch
@@ -348,18 +371,55 @@ else if (asama == Asama.Onay)
         _ => null
     };
 
+    // Araç girişlerinde süre Ziyaret Sebebi'nden bağımsızdır (kişi girişleri
+    // hâlâ yukarıdaki SureLimiti/Ziyaret Sebebi kuralını kullanır): Vinç ve
+    // Vidanjör her zaman süresiz, diğer tüm araç türleri her zaman 15 dakika.
+    private static TimeSpan? AracSureLimiti(AracTuru tur) => tur switch
+    {
+        AracTuru.Vinc => null,
+        AracTuru.Vidanjor => null,
+        _ => TimeSpan.FromMinutes(15)
+    };
+
+    // Barkod okuyucu karakterleri milisaniyeler içinde art arda gönderir;
+    // her karakterde hemen DB sorgusu atarsak aynı (paylaşılan, circuit
+    // başına tek) DbContext üzerinde üst üste binen sorgular "A second
+    // operation was started on this context instance..." hatasına yol
+    // açıyordu (2026-08-24'te fark edildi). Çözüm: son karakterden sonra
+    // kısa bir sessizlik (debounce) bekleyip öyle sorgulamak — yeni bir
+    // karakter/Kontrol gönderimi gelirse önceki bekleyen sorgu iptal edilir.
+    private CancellationTokenSource? kimlikAramaCts;
+    private CancellationTokenSource? takipAramaCts;
+
     private async Task KimlikNumarasiDegisti(string? v)
     {
         kimlikNumarasi = v ?? string.Empty;
 
+        kimlikAramaCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        kimlikAramaCts = cts;
+
         var arama = kimlikNumarasi.Trim();
-        eslesenKisiler = string.IsNullOrEmpty(arama)
-            ? []
-            : await Db.Kisiler.AsNoTracking()
+        if (string.IsNullOrEmpty(arama))
+        {
+            eslesenKisiler = [];
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(200, cts.Token);
+            await using var db = await DbFactory.CreateDbContextAsync(cts.Token);
+            eslesenKisiler = await db.Kisiler.AsNoTracking()
                 .Where(k => k.KimlikNumarasi.Contains(arama))
                 .OrderBy(k => k.KimlikNumarasi)
                 .Take(5)
-                .ToListAsync();
+                .ToListAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Kullanıcı yazmaya devam etti veya Kontrol'e bastı, bu arama artık geçersiz.
+        }
     }
 
     private void EslesenKisiSec(Kisi eslesen)
@@ -372,14 +432,31 @@ else if (asama == Asama.Onay)
     {
         takipNumarasi = v ?? string.Empty;
 
+        takipAramaCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        takipAramaCts = cts;
+
         var arama = takipNumarasi.Trim();
-        eslesenAraclar = string.IsNullOrEmpty(arama)
-            ? []
-            : await Db.Araclar.AsNoTracking()
+        if (string.IsNullOrEmpty(arama))
+        {
+            eslesenAraclar = [];
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(200, cts.Token);
+            await using var db = await DbFactory.CreateDbContextAsync(cts.Token);
+            eslesenAraclar = await db.Araclar.AsNoTracking()
                 .Where(a => a.TakipNumarasi.Contains(arama))
                 .OrderBy(a => a.TakipNumarasi)
                 .Take(5)
-                .ToListAsync();
+                .ToListAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Kullanıcı yazmaya devam etti veya Kontrol'e bastı, bu arama artık geçersiz.
+        }
     }
 
     private void EslesenAracSec(Arac eslesen)
@@ -388,8 +465,47 @@ else if (asama == Asama.Onay)
         eslesenAraclar = [];
     }
 
+    // Tekneler zaten OnInitializedAsync'te belleğe yüklendiği için burada
+    // yeni bir DB sorgusu gerekmiyor (Kimlik/Takip No aramalarının aksine)
+    // — filtreleme tamamen bellek içinde yapılıyor.
+    // onayTekneId burada HER yazışta null'a çekilir: kullanıcı bir tekne
+    // seçtikten sonra kutuya tekrar yazarsa, ekrandaki metinle kayıtta
+    // gidecek TekneId'nin uyuşmadığı bir ara durum oluşmasın diye — geçerli
+    // bir Id yalnızca listeden TekneSec ile tıklanarak seçildiğinde set edilir.
+    private void TekneAramaDegisti(string? v)
+    {
+        tekneArama = v ?? string.Empty;
+        onayTekneId = null;
+
+        var arama = tekneArama.Trim();
+        eslesenTekneler = string.IsNullOrEmpty(arama)
+            ? []
+            : tekneler
+                .Where(t => t.TekneKodu.Contains(arama, StringComparison.OrdinalIgnoreCase)
+                         || t.TekneAdi.Contains(arama, StringComparison.OrdinalIgnoreCase))
+                .Take(8)
+                .ToList();
+    }
+
+    private void TekneSec(Tekne tekne)
+    {
+        onayTekneId = tekne.Id;
+        tekneArama = $"{tekne.TekneKodu} — {tekne.TekneAdi}";
+        eslesenTekneler = [];
+    }
+
+    private void TekneSecimiTemizle()
+    {
+        onayTekneId = null;
+        tekneArama = string.Empty;
+        eslesenTekneler = [];
+    }
+
     private async Task KontrolYap()
     {
+        kimlikAramaCts?.Cancel();
+        takipAramaCts?.Cancel();
+
         basariMesaji = null;
         kisiEngelMesaji = null;
         kisiEngelYonlendirmeGoster = false;
@@ -414,14 +530,16 @@ else if (asama == Asama.Onay)
             return;
         }
 
+        await using var db = await DbFactory.CreateDbContextAsync();
+
         if (!string.IsNullOrWhiteSpace(kimlik))
         {
-            await KisiKontrolYap(kimlik);
+            await KisiKontrolYap(db, kimlik);
         }
 
         if (!string.IsNullOrWhiteSpace(takip))
         {
-            await AracKontrolYap(takip);
+            await AracKontrolYap(db, takip);
         }
 
         // İkisi birden başarılı olmak zorunda değil — hangisi geçerse
@@ -431,14 +549,16 @@ else if (asama == Asama.Onay)
             onayFirmaAdi = bulunanKisi?.FirmaAdi ?? bulunanArac?.FirmaAdi;
             onayTelefon = bulunanKisi?.Telefon;
             onayTekneId = null;
+            tekneArama = string.Empty;
+            eslesenTekneler = [];
             onayAciklama = null;
             asama = Asama.Onay;
         }
     }
 
-    private async Task KisiKontrolYap(string kimlik)
+    private async Task KisiKontrolYap(ApplicationDbContext db, string kimlik)
     {
-        var kisi = await Db.Kisiler.AsNoTracking().FirstOrDefaultAsync(k => k.KimlikNumarasi == kimlik);
+        var kisi = await db.Kisiler.AsNoTracking().FirstOrDefaultAsync(k => k.KimlikNumarasi == kimlik);
         if (kisi is null)
         {
             kisiEngelMesaji = "Bu kimlik numarasıyla kayıtlı bir kişi bulunamadı.";
@@ -457,16 +577,16 @@ else if (asama == Asama.Onay)
             return;
         }
 
-        var acikKaydiVarMi = await Db.CekekTakipleri.AnyAsync(c => c.KisiId == kisi.Id && c.CikisTarihi == null);
+        var acikKaydiVarMi = await db.CekekTakipleri.AnyAsync(c => c.KisiId == kisi.Id && c.CikisTarihi == null);
         if (acikKaydiVarMi)
         {
             kisiEngelMesaji = "Bu kişinin sahada çıkışı yapılmamış açık bir kaydı var, tekrar giriş yapılamaz.";
             return;
         }
 
-        var kurallar = await Db.KisiBelgeleri.AsNoTracking().Where(b => b.Aktif).ToListAsync();
+        var kurallar = await db.KisiBelgeleri.AsNoTracking().Where(b => b.Aktif).ToListAsync();
         var uygulanabilirKurallar = kurallar.Where(b => ZiyaretSebebineUygulanir(b, ziyaretSebebi)).ToList();
-        var kontroller = await Db.KisiBelgeKontrolleri.AsNoTracking().Where(k => k.KisiId == kisi.Id).ToListAsync();
+        var kontroller = await db.KisiBelgeKontrolleri.AsNoTracking().Where(k => k.KisiId == kisi.Id).ToListAsync();
 
         var eksikler = new List<string>();
 
@@ -518,9 +638,9 @@ else if (asama == Asama.Onay)
         bulunanKisi = kisi;
     }
 
-    private async Task AracKontrolYap(string takip)
+    private async Task AracKontrolYap(ApplicationDbContext db, string takip)
     {
-        var arac = await Db.Araclar.AsNoTracking().FirstOrDefaultAsync(a => a.TakipNumarasi == takip);
+        var arac = await db.Araclar.AsNoTracking().FirstOrDefaultAsync(a => a.TakipNumarasi == takip);
         if (arac is null)
         {
             aracEngelMesaji = "Bu takip numarasıyla kayıtlı bir araç bulunamadı.";
@@ -539,7 +659,7 @@ else if (asama == Asama.Onay)
             return;
         }
 
-        var acikKaydiVarMi = await Db.CekekTakipleri.AnyAsync(c => c.AracId == arac.Id && c.CikisTarihi == null);
+        var acikKaydiVarMi = await db.CekekTakipleri.AnyAsync(c => c.AracId == arac.Id && c.CikisTarihi == null);
         if (acikKaydiVarMi)
         {
             aracEngelMesaji = "Bu aracın sahada çıkışı yapılmamış açık bir kaydı var, tekrar giriş yapılamaz.";
@@ -548,9 +668,9 @@ else if (asama == Asama.Onay)
 
         // Araç belgeleri Ziyaret Sebebi'nden bağımsız, AracTuru'ne göre
         // filtrelenir; KVKK benzeri özel bir kontrol yok.
-        var kurallar = await Db.AracBelgeleri.AsNoTracking().Where(b => b.Aktif).ToListAsync();
+        var kurallar = await db.AracBelgeleri.AsNoTracking().Where(b => b.Aktif).ToListAsync();
         var uygulanabilirKurallar = kurallar.Where(b => AracTurineUygulanir(b, arac.AracTuru)).ToList();
-        var kontroller = await Db.AracBelgeKontrolleri.AsNoTracking().Where(k => k.AracId == arac.Id).ToListAsync();
+        var kontroller = await db.AracBelgeKontrolleri.AsNoTracking().Where(k => k.AracId == arac.Id).ToListAsync();
 
         var eksikler = new List<string>();
 
@@ -588,6 +708,8 @@ else if (asama == Asama.Onay)
 
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
             var simdi = DateTime.Now;
             var sure = SureLimiti(ziyaretSebebi);
             DateTime? beklenenBitis = sure is null ? null : simdi.Add(sure.Value);
@@ -597,7 +719,7 @@ else if (asama == Asama.Onay)
                 // bulunanKisi, KontrolYap'ta AsNoTracking ile okundu (başka
                 // sekmelerde yapılan güncellemeleri anında görebilmek için) —
                 // kaydetmeden önce izlenebilir (tracked) taze bir kopya çekilir.
-                var kisi = await Db.Kisiler.FindAsync(bulunanKisi.Id);
+                var kisi = await db.Kisiler.FindAsync(bulunanKisi.Id);
                 if (kisi is null)
                 {
                     hataMesaji = "Kişi bulunamadı, sayfayı yenileyin.";
@@ -619,7 +741,7 @@ else if (asama == Asama.Onay)
                     BeklenenBitisZamani = beklenenBitis,
                     Aciklama = onayAciklama
                 };
-                Db.CekekTakipleri.Add(kisiGiris);
+                db.CekekTakipleri.Add(kisiGiris);
 
                 kisi.FirmaAdi = onayFirmaAdi;
                 kisi.Telefon = onayTelefon;
@@ -627,12 +749,15 @@ else if (asama == Asama.Onay)
 
             if (bulunanArac is not null)
             {
-                var arac = await Db.Araclar.FindAsync(bulunanArac.Id);
+                var arac = await db.Araclar.FindAsync(bulunanArac.Id);
                 if (arac is null)
                 {
                     hataMesaji = "Araç bulunamadı, sayfayı yenileyin.";
                     return;
                 }
+
+                var aracSure = AracSureLimiti(arac.AracTuru);
+                DateTime? aracBeklenenBitis = aracSure is null ? null : simdi.Add(aracSure.Value);
 
                 var aracGiris = new ViaCekek.Web.Models.CekekTakip
                 {
@@ -646,15 +771,16 @@ else if (asama == Asama.Onay)
                     GirisSaati = TimeOnly.FromDateTime(simdi),
                     ZiyaretSebebi = ziyaretSebebi,
                     Durum = CekekTakipDurumu.GirisYapildi,
-                    BeklenenBitisZamani = beklenenBitis,
+                    BeklenenBitisZamani = aracBeklenenBitis,
                     Aciklama = onayAciklama
                 };
-                Db.CekekTakipleri.Add(aracGiris);
+                db.CekekTakipleri.Add(aracGiris);
 
                 arac.FirmaAdi = onayFirmaAdi;
             }
 
-            await Db.SaveChangesAsync();
+            db.MevcutKullanici = await AktifKullaniciAdi();
+            await db.SaveChangesAsync();
 
             var parcalar = new List<string>();
             if (bulunanKisi is not null)

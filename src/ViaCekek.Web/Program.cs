@@ -33,8 +33,27 @@ builder.Services.AddAuthentication(options =>
     .AddIdentityCookies();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+
+// Identity'nin store'ları (UserStore/RoleStore) Scoped bir ApplicationDbContext
+// bekler, o yüzden AddDbContext hâlâ duruyor. Ama sayfalarımız artık bunu
+// doğrudan enjekte etmek yerine IDbContextFactory kullanıyor (aşağıda) — her
+// işlemde kısa ömürlü, ayrı bir DbContext açar. Bunun sebebi: prerender +
+// interaktif circuit aynı Scoped DbContext'i paylaşırsa "A second operation
+// was started on this context instance..." hatası oluyordu (bkz. CLAUDE.md);
+// önceki çözüm prerender'ı tamamen kapatmaktı ama bu, WebSocket/SignalR
+// bağlantısı kurulana kadar sayfa gövdesini boş bırakıyor — VPN üzerinden
+// bağlanan mobil cihazlarda bu bağlantı hiç kurulamayınca sayfa kalıcı olarak
+// boş kalıyordu. IDbContextFactory ile her sayfa kendi kısa ömürlü context'ini
+// açıp kapattığı için prerender güvenle tekrar açılabiliyor.
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
+// AddDbContext + AddDbContextFactory'yi aynı context için birlikte kullanmak
+// DI doğrulama hatası veriyor (Singleton factory, Scoped DbContextOptions
+// tüketemez) — bunun yerine Identity'nin ihtiyaç duyduğu Scoped
+// ApplicationDbContext, factory'den üretilerek kaydediliyor (resmi
+// önerilen kombine desen).
+builder.Services.AddScoped<ApplicationDbContext>(sp =>
+    sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = false)

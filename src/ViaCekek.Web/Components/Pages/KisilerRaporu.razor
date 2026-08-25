@@ -1,12 +1,12 @@
 @page "/kisilerraporu"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
 @using ClosedXML.Excel
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IJSRuntime JS
 
 <PageTitle>Kişiler Raporu</PageTitle>
@@ -233,7 +233,8 @@ else
 
     private async Task Filtrele()
     {
-        var sorgu = Db.Kisiler.AsNoTracking().AsQueryable();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var sorgu = db.Kisiler.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(kimlikFiltre.Deger))
         {

@@ -1,11 +1,12 @@
 @page "/kisibelgeleri"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Kişi Belgeleri</PageTitle>
 
@@ -165,9 +166,16 @@ else
         await ListeyiYenile();
     }
 
+    private async Task<string?> AktifKullaniciAdi()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return authState.User?.Identity?.Name;
+    }
+
     private async Task ListeyiYenile()
     {
-        belgeler = await Db.KisiBelgeleri.OrderBy(b => b.BelgeTanimi).ToListAsync();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        belgeler = await db.KisiBelgeleri.OrderBy(b => b.BelgeTanimi).ToListAsync();
     }
 
     private static IEnumerable<string> ZiyaretSebepleri(KisiBelge belge)
@@ -220,13 +228,15 @@ else
         hataMesaji = null;
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
             if (duzenlenenBelge.Id == 0)
             {
-                Db.KisiBelgeleri.Add(duzenlenenBelge);
+                db.KisiBelgeleri.Add(duzenlenenBelge);
             }
             else
             {
-                var mevcut = await Db.KisiBelgeleri.FindAsync(duzenlenenBelge.Id);
+                var mevcut = await db.KisiBelgeleri.FindAsync(duzenlenenBelge.Id);
                 if (mevcut is null)
                 {
                     hataMesaji = "Kayıt bulunamadı, sayfayı yenileyin.";
@@ -246,7 +256,8 @@ else
                 mevcut.GecerliIskeleKurma = duzenlenenBelge.GecerliIskeleKurma;
             }
 
-            await Db.SaveChangesAsync();
+            db.MevcutKullanici = await AktifKullaniciAdi();
+            await db.SaveChangesAsync();
             formAcik = false;
             await ListeyiYenile();
         }

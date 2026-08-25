@@ -56,9 +56,13 @@ tek taraflı yapılmaz.
     uygulama tabloları
   - `Data/Migrations/` — EF Core migration geçmişi
   - `Components/Pages/` — ekranlar (örn. `Tekneler.razor`), her biri
-    `@attribute [Authorize]` + `@rendermode @(new InteractiveServerRenderMode(prerender: false))`
-    (2026-08-11'den itibaren — düz `InteractiveServer` kısayolu değil,
-    bkz. Zamanlayıcı bölümündeki "concurrent DbContext" notu)
+    `@attribute [Authorize]` + `@rendermode InteractiveServer` (düz
+    kısayol — 2026-08-24'ten itibaren tekrar güvenli, bkz. Zamanlayıcı
+    bölümündeki "concurrent DbContext / IDbContextFactory" notu) ve
+    `@inject IDbContextFactory<ApplicationDbContext> DbFactory`
+    (`@inject ApplicationDbContext Db` **değil** — her DB işleminde
+    `await using var db = await DbFactory.CreateDbContextAsync();` ile
+    kısa ömürlü ayrı bir context açılır)
   - `Components/App.razor` — **DENENDİ VE GERİ ALINDI (2026-08-06)**:
     `Home.razor`'da eksik olan `@rendermode InteractiveServer` yüzünden
     navbar toggler'ın tıklamaya yanıt vermemesi sorunu için önce
@@ -156,6 +160,50 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Tekne alanı aranabilir yapıldı (2026-08-24)**: `/cekektakip` Onay
+  aşamasındaki Tekne `<select>` dropdown'u, Kimlik/Takip No alanlarıyla
+  aynı desende arama-kutusu + tıklanabilir sonuç listesine çevrildi
+  (Tekne Kodu/Adı'nda içerir araması, `tekneler` zaten belleğe yüklü
+  olduğu için yeni bir DB sorgusu gerekmiyor). Ara denemede HTML
+  `<datalist>` (native tarayıcı filtreleme) denendi ama kullanıcı
+  beğenmedi ("bu tasarımı sevmedim... önceki yazarken listeleyen format
+  daha iyi") — arama-kutusu + liste tasarımına geri dönüldü.
+  **Gerçek bug + düzeltme**: ilk arama-kutusu deneme sinde, bir tekne
+  seçildikten sonra kullanıcı kutuya tekrar yazarsa `onayTekneId` eski
+  seçimde takılı kalıyordu (ekrandaki metinle kayıtta gidecek TekneId
+  uyuşmuyordu) — kullanıcı bunu fark edip düzeltilmesini istedi.
+  **Çözüm**: `TekneAramaDegisti` artık her yazışta `onayTekneId`'yi hemen
+  `null`'a çekiyor; geçerli bir Id yalnızca listeden `TekneSec` ile
+  tıklanarak seçildiğinde set ediliyor — böylece kayıt anında `TekneId`
+  ya geçerli bir seçime karşılık gelir ya da boştur, asla ekrandaki
+  metinle uyuşmayan eski bir Id olamaz.
+
+- **Düzeltildi (2026-08-24): barkod okuyucuyla Kimlik/Takip No girişinde
+  "An unhandled error has occurred"**. `/cekektakip`'te Kimlik No ve
+  Takip No alanları her karakterde (`oninput`) canlı autocomplete için
+  DB sorgusu atıyordu. Normal klavye yazımında karakterler arası süre
+  yeterince uzun olduğu için önceki sorgu bitmeden yenisi başlamıyordu;
+  ama barkod okuyucu tüm karakterleri milisaniyeler içinde art arda
+  gönderdiği için aynı (circuit başına tek, paylaşılan) `DbContext`
+  üzerinde üst üste binen sorgular oluşup klasik "A second operation was
+  started on this context instance..." hatasını tetikliyordu — bu, daha
+  önce prerender+interactive-circuit çakışmasından kaynaklanan concurrent
+  DbContext hatasından **farklı bir kök sebep**, aynı semptom. Gerçek
+  DB'ye karşı scratch script'le hem eski kodun gerçekten bu exception'ı
+  fırlattığı hem de düzeltmenin fırlatmadığı doğrulandı. **Çözüm**:
+  `KimlikNumarasiDegisti`/`TakipNumarasiDegisti` artık 200ms debounce
+  kullanıyor (`CancellationTokenSource` ile — yeni bir karakter gelince
+  önceki bekleyen arama iptal edilir, `Task.Delay`/`ToListAsync`
+  `OperationCanceledException` fırlatırsa sessizce yutulur); `KontrolYap()`
+  (form submit / Kontrol butonu) başında da her iki alanın bekleyen
+  aramasını iptal ediyor — barkod okuyucunun karakterlerin hemen ardından
+  gönderdiği Enter'ın, henüz tamamlanmamış bir debounce sorgusuyla
+  çakışmasını da engeller. **Kural**: bundan sonra `oninput` bazlı
+  canlı-arama/autocomplete alanları eklenirken debounce + iptal deseni
+  varsayılan olmalı, düz "her tuşta sorgu" deseni kullanılmamalı — insan
+  yazımında sorun çıkarmayabilir ama barkod okuyucu/yapıştırma gibi hızlı
+  girişlerde DbContext çakışmasına yol açar.
+
 - ✅ **Kişiler Raporu eklendi (2026-08-12)**, `/kisilerraporu`
   (Yönetici + Saha Kontrolörü; Güvenlik erişemez — Takip Raporu'yla aynı
   `AuthorizeView` grubu, `MainLayout.razor`). `KisilerRaporu.razor`,
@@ -203,9 +251,9 @@ sıradaki adım olarak güncellenmeli.
   Saha Kontrolörü; Güvenlik erişemez — `MainLayout.razor`'da ayrı
   `AuthorizeView` grubunda). `CekekTakipRaporu.razor`, `@using
   CekekTakipKaydi = ViaCekek.Web.Models.CekekTakip` alias'ıyla (namespace
-  çakışması için, bkz. Board notu) ve
-  `@rendermode @(new InteractiveServerRenderMode(prerender: false))` ile.
-  **Kapsam bilinçli basitleştirildi**: DB View yok, isimli/kayıtlı
+  çakışması için, bkz. Board notu) ve `@rendermode InteractiveServer` ile
+  (2026-08-24'ten itibaren `IDbContextFactory` deseni, bkz. Zamanlayıcı
+  bölümü). **Kapsam bilinçli basitleştirildi**: DB View yok, isimli/kayıtlı
   filtreler yok (farklı ihtiyaçlar için ayrı sabit raporlar üretilecek —
   bkz. yukarıda Kişiler Raporu), Dynamic LINQ/ham SQL yok — sütunlar
   sabit olduğu için her filtre normal, tip-güvenli `.Where()` koşulu.
@@ -278,24 +326,77 @@ sıradaki adım olarak güncellenmeli.
   resetler) ve **"Çıkış"** (ÇıkışTarihi/Saati yazar, Durum `CikisYapildi`
   olur, karttan kaybolur) butonları var. Gerçek DB'ye karşı scratch
   script'le doğrulandı (sıralama, otomatik durum geçişi, Çıkış, +15 dk).
-- **Düzeltildi, tüm ekranlara yayıldı (2026-08-11)**: "A second operation
-  was started on this context instance..." (concurrent DbContext) hatası
-  — herhangi bir sayfa **tam sayfa yüklemesiyle** (URL'e doğrudan gidiş,
-  yenileme, giriş sonrası yönlendirme — sadece SPA içi gezinme değil)
-  açıldığında, prerender + interaktif circuit'in `OnInitializedAsync`'i
-  aynı `DbContext` üzerinde çakışarak iki kez tetiklemesinden
-  kaynaklanıyordu. Önce yalnızca Board'da (ana sayfa olduğu için ilk
-  fark edilen yer) görüldü, sonra `/cekektakip`'te de aynı hata çıkınca
-  bunun aslında **tüm sayfaları** etkileyen bir risk olduğu anlaşıldı.
-  Çözüm tüm `Components/Pages/*.razor` dosyalarına uygulandı: sayfa
-  düzeyindeki `@rendermode InteractiveServer` →
-  `@rendermode @(new InteractiveServerRenderMode(prerender: false))`
-  — prerender kapatıldı, `OnInitializedAsync` artık her sayfada yalnızca
-  circuit bağlandığında bir kez çalışıyor. **Ders**: yeni bir sayfa
-  eklenince de bu şekilde (prerender: false) yazılmalı, düz
-  `InteractiveServer` kısayolu artık kullanılmamalı — Identity/Account
-  sayfaları hâlâ istisna (bkz. App.razor notu, onlar hiç rendermode
-  almamalı, statik kalmalı).
+- **Düzeltildi (2026-08-11), sonra kökten değiştirildi (2026-08-24) —
+  concurrent DbContext / prerender geçmişi**: "A second operation was
+  started on this context instance..." hatası — herhangi bir sayfa
+  **tam sayfa yüklemesiyle** (URL'e doğrudan gidiş, yenileme, giriş
+  sonrası yönlendirme) açıldığında, prerender + interaktif circuit'in
+  `OnInitializedAsync`'i aynı `DbContext` üzerinde çakışarak iki kez
+  tetiklemesinden kaynaklanıyordu. 2026-08-11'de tüm sayfalarda
+  `prerender: false` ile geçici olarak çözülmüştü — ama bu, sayfa gövdesini
+  SignalR devresi bağlanana kadar tamamen boş bırakıyordu; VPN üzerinden
+  bağlanan mobil cihazlarda bu bağlantı hiç kurulamayınca (2026-08-24'te
+  kullanıcı raporladı — "An unhandled error has occurred" değil, sayfa
+  gövdesi sonsuza kadar boş kalıyordu) ekran kalıcı olarak boş görünüyordu.
+  **Kalıcı çözüm (2026-08-24)**: paylaşılan, circuit ömürlü tek
+  `ApplicationDbContext` yerine `IDbContextFactory<ApplicationDbContext>`
+  kullanımına geçildi — her sayfa artık her DB işleminde
+  `await using var db = await DbFactory.CreateDbContextAsync();` ile kısa
+  ömürlü, ayrı bir context açıyor; prerender + interaktif circuit aynı anda
+  çalışsa bile artık HİÇBİR ZAMAN aynı instance'ı paylaşmıyorlar, çakışma
+  yapısal olarak imkansız hale geldi. Bu sayede prerender tüm sayfalarda
+  güvenle geri açıldı (`@rendermode InteractiveServer` — düz kısayol,
+  artık `prerender: false` gerekmiyor), sayfa gövdesi artık SignalR
+  bağlanmadan önce bile (ilk HTTP yanıtında) gerçek veriyle doluyor —
+  bağlantı sonradan başarısız olsa bile kullanıcı boş ekran yerine içerik
+  görüyor. Detaylar için bkz. altta "IDbContextFactory'ye geçiş" notu.
+  **Ders**: yeni bir sayfa eklenince `@rendermode InteractiveServer`
+  (düz kısayol) + `@inject IDbContextFactory<ApplicationDbContext>
+  DbFactory` deseni kullanılmalı, `@inject ApplicationDbContext Db`
+  artık kullanılmamalı — Identity/Account sayfaları hâlâ istisna (bkz.
+  App.razor notu, onlar hiç rendermode almamalı, statik kalmalı).
+  **VPN/Palo Alto tarafı da çözüldü (2026-08-25)**: prerender fix'i
+  sayfanın en azından görünür olmasını sağlamıştı, ama VPN'li mobil
+  cihazlarda SignalR devresi (WebSocket) hâlâ kurulamıyor, bu yüzden
+  Kontrol/Yeni Kişi gibi interaktif butonlar tepki vermiyordu — IIS
+  tarafında WebSocket Protocol özelliği zaten kuruluydu, sorun Palo Alto
+  güvenlik duvarı/GlobalProtect tarafındaydı (App-ID/security policy,
+  SSL decryption veya idle/session timeout ihtimallerinden biri —
+  kullanıcı hangisi olduğunu belirtmedi, yalnızca "VPN sorunu çözüldü"
+  onayı verdi). Bu konu artık kapalı, ayrı bir iş kalmadı.
+
+- **IDbContextFactory'ye geçiş (2026-08-24)** — tüm detaylar: `Program.cs`
+  artık `AddDbContextFactory<ApplicationDbContext>()` kullanıyor;
+  Identity'nin ihtiyaç duyduğu Scoped `ApplicationDbContext` bu factory'den
+  türetilerek kaydediliyor (`AddScoped<ApplicationDbContext>(sp =>
+  sp.GetRequiredService<IDbContextFactory<...>>().CreateDbContext())`) —
+  ikisini `AddDbContext` + `AddDbContextFactory` olarak ayrı ayrı kaydetmek
+  DI doğrulama hatası veriyordu (Singleton factory, Scoped
+  `DbContextOptions` tüketemez), gerçek `dotnet run` ile denenip
+  doğrulandı. `ApplicationDbContext` artık constructor'ında
+  `AuthenticationStateProvider` almıyor (Singleton factory ile Scoped
+  servis çakışmasının asıl kaynağı buydu, önceki denemede bu yüzden
+  rafa kalkmıştı) — bunun yerine `MevcutKullanici` adında settable bir
+  `string?` property var; her sayfa, `SaveChangesAsync()`'ten hemen önce
+  `db.MevcutKullanici = await AktifKullaniciAdi();` ile (kendi enjekte
+  ettiği `AuthenticationStateProvider` üzerinden) dolduruyor —
+  `UygulaAuditBilgisi()` bunu `Kaydeden`/`Guncelleyen` için kullanıyor,
+  set edilmezse `"system"`e düşüyor. Dokuz sayfa da (`Board`,
+  `CekekTakip`, `Kisiler`, `Araclar`, `Tekneler`, `KisiBelgeleri`,
+  `AracBelgeleri`, `CekekTakipRaporu`, `KisilerRaporu`) bu desene
+  çevrildi — her metod kendi kısa ömürlü `db`'sini açıyor (aynı metod
+  içinde sıralı/awaited çağrılar aynı `db`'yi paylaşabiliyor, örn.
+  `CekekTakip.razor`'daki `KontrolYap` → `KisiKontrolYap`/`AracKontrolYap`
+  zinciri — risk yalnızca prerender/interactive gibi **gerçekten paralel**
+  yollarda). `Kullanicilar.razor` dokunulmadı (`UserManager`/`RoleManager`
+  kullanıyor, ham `DbContext` enjekte etmiyor). Gerçek DB'ye karşı ve
+  gerçek `dotnet run` + curl ile uçtan uca doğrulandı: 9 sayfanın hepsi
+  art arda 3'er kez tam sayfa yüklemesiyle (orijinal hatayı tetikleyen
+  senaryonun birebir aynısı) hatasız 200 döndü, prerender'ın ilk HTTP
+  yanıtında gerçek veri (örn. Board kartları) ürettiği doğrulandı;
+  audit alanları ayrı bir scratch script'le (INSERT→Kaydeden/KayitTarihi,
+  UPDATE→Guncelleyen/GuncellemeTarihi, MevcutKullanici set edilmezse
+  "system" fallback'i) üç senaryoda da doğru çalıştığı teyit edildi.
 - **Karar (2026-08-11)**: Gerçek bir zamanlayıcı (`BackgroundService`)
   kurulmayacak — Board'un sayfa ziyaretinde tazeleme yapan mevcut hafif
   yaklaşımı kalıcı çözüm olarak kabul edildi, bu konu kapandı.
@@ -551,6 +652,22 @@ varsayımları kullanıcıyla konuşulup yukarıdaki akışa değiştirildi.
   Keşif/Kontrol = **1 saat**, Malzeme Alma/Malzeme Bırakma = **15
   dakika**. Süresi dolan kayıtlar board'da öncelik artırılarak en üste
   çıkar; kullanıcı board üzerinden "+15 dk" uzatma verebilir.
+- **Araç girişleri için süre kuralı Ziyaret Sebebi'nden tamamen
+  bağımsız hale getirildi (2026-08-24)**: Kişi girişleri hâlâ yukarıdaki
+  Ziyaret Sebebi kuralını kullanır (`SureLimiti()`, değişmedi — "kişilerde
+  sorun yok"), ama araç girişlerinde artık Ziyaret Sebebi hiç dikkate
+  alınmıyor: `CekekTakip.razor` > `AracSureLimiti()` — Vinç ve Vidanjör
+  **her zaman süresiz**, diğer tüm araç türleri (Araç/Kompresör/Basınçlı
+  Kap) **her zaman 15 dakika**. (İlk halinde yalnızca Vinç/Vidanjör
+  süresiz yapılmış, diğer türler hâlâ Ziyaret Sebebi'ne göre değişen eski
+  süreyi almıştı — kullanıcı bunun yerine tüm diğer araçların da her
+  zaman sabit 15 dakika olmasını istedi.) Bu yalnızca araç satırını
+  etkiler — aynı girişte birlikte kaydedilen kişi satırının süresi
+  (varsa) etkilenmez. Gerçek DB'ye karşı scratch script'le doğrulandı:
+  hem Çalışma hem Keşif Ziyaret Sebebi'yle ayrı ayrı denendi, Vinç/
+  Vidanjör ikisinde de süresiz, Araç/Kompresör ikisinde de tam 15 dakika
+  çıktı; kişi satırı ise beklendiği gibi Çalışma'da süresiz, Keşif'te
+  süreli kaldı.
 - **Şema eklendi (2026-08-07, migration uygulandı)**: `CekekTakipleri`ye
   `Durum` (enum: `GirisYapildi`/`ZamanAsimi`/`CikisYapildi`, varsayılan
   `GirisYapildi`) ve `BeklenenBitisZamani` (nullable DateTime, süresiz

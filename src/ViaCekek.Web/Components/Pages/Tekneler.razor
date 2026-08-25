@@ -1,12 +1,13 @@
 @page "/tekneler"
 @attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using ViaCekek.Web.Data
 @using ViaCekek.Web.Models
 @using ViaCekek.Web.Models.Common
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Tekne Tanımları</PageTitle>
 
@@ -160,9 +161,16 @@ else
         await ListeyiYenile();
     }
 
+    private async Task<string?> AktifKullaniciAdi()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        return authState.User?.Identity?.Name;
+    }
+
     private async Task ListeyiYenile()
     {
-        tekneler = await Db.Tekneler.OrderBy(t => t.TekneKodu).ToListAsync();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        tekneler = await db.Tekneler.OrderBy(t => t.TekneKodu).ToListAsync();
     }
 
     private void YeniTekneBaslat()
@@ -196,13 +204,15 @@ else
         hataMesaji = null;
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
             if (duzenlenenTekne.Id == 0)
             {
-                Db.Tekneler.Add(duzenlenenTekne);
+                db.Tekneler.Add(duzenlenenTekne);
             }
             else
             {
-                var mevcut = await Db.Tekneler.FindAsync(duzenlenenTekne.Id);
+                var mevcut = await db.Tekneler.FindAsync(duzenlenenTekne.Id);
                 if (mevcut is null)
                 {
                     hataMesaji = "Kayıt bulunamadı, sayfayı yenileyin.";
@@ -214,7 +224,8 @@ else
                 mevcut.Aktif = duzenlenenTekne.Aktif;
             }
 
-            await Db.SaveChangesAsync();
+            db.MevcutKullanici = await AktifKullaniciAdi();
+            await db.SaveChangesAsync();
             formAcik = false;
             await ListeyiYenile();
         }
