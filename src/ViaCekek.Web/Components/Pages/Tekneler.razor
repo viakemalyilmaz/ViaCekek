@@ -48,21 +48,17 @@
 
 @if (!formAcik)
 {
-@if (tekneler is null)
-{
-    <p>Yükleniyor...</p>
-}
-else if (tekneler.Count == 0)
-{
-    <p>Henüz tekne kaydı yok.</p>
-}
-else
-{
     <div class="mb-3">
-        <input type="search" class="form-control" style="max-width: 400px;" placeholder="Ara (tekne kodu, tekne adı)..." @bind="aramaMetni" @bind:event="oninput" />
+        <input type="search" class="form-control" style="max-width: 400px;"
+               placeholder="Aramak için yazın (tekne kodu, tekne adı)..."
+               @bind:get="aramaMetni" @bind:set="AramaDegisti" @bind:event="oninput" autocomplete="off" />
     </div>
 
-    @if (!GorunenTekneler.Any())
+    @if (aramaSonuclari is null)
+    {
+        <p>Aramak için yukarıya yazın.</p>
+    }
+    else if (aramaSonuclari.Count == 0)
     {
         <p>Aramanızla eşleşen kayıt bulunamadı.</p>
     }
@@ -79,7 +75,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var tekne in GorunenTekneler)
+            @foreach (var tekne in aramaSonuclari)
             {
                 <tr>
                     <td>@tekne.TekneKodu</td>
@@ -102,46 +98,81 @@ else
         </tbody>
     </table>
     </div>
+    @if (aramaSonuclari.Count == AramaSonucLimiti)
+    {
+        <p class="text-muted">İlk @AramaSonucLimiti sonuç gösteriliyor — daha spesifik arayın.</p>
     }
-}
+    }
 }
 
 @code {
-    private List<Tekne>? tekneler;
+    // Bkz. Kisiler.razor'daki aynı not: büyük tabloda tam liste yüklemesi
+    // yerine arama-öncelikli, sunucu tarafı debounce'lu sorgu deseni.
+    private const int AramaSonucLimiti = 50;
+
     private Tekne duzenlenenTekne = new();
     private bool formAcik;
     private string? hataMesaji;
 
     private string aramaMetni = string.Empty;
+    private List<Tekne>? aramaSonuclari;
+    private CancellationTokenSource? aramaCts;
     private string siralamaAlani = "TekneKodu";
     private bool siralamaArtan = true;
 
-    private IEnumerable<Tekne> GorunenTekneler
+    private IQueryable<Tekne> AramaSorgusu(ApplicationDbContext db, string arama)
     {
-        get
+        var sorgu = db.Tekneler.AsNoTracking().Where(t =>
+            t.TekneKodu.Contains(arama) || t.TekneAdi.Contains(arama));
+
+        return siralamaAlani switch
         {
-            IEnumerable<Tekne> sonuc = tekneler ?? [];
+            "TekneAdi" => siralamaArtan ? sorgu.OrderBy(t => t.TekneAdi) : sorgu.OrderByDescending(t => t.TekneAdi),
+            "Durum" => siralamaArtan ? sorgu.OrderBy(t => t.Aktif) : sorgu.OrderByDescending(t => t.Aktif),
+            _ => siralamaArtan ? sorgu.OrderBy(t => t.TekneKodu) : sorgu.OrderByDescending(t => t.TekneKodu),
+        };
+    }
 
-            if (!string.IsNullOrWhiteSpace(aramaMetni))
-            {
-                var arama = aramaMetni.Trim();
-                sonuc = sonuc.Where(t =>
-                    (t.TekneKodu?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (t.TekneAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false));
-            }
+    private async Task AramaDegisti(string? v)
+    {
+        aramaMetni = v ?? string.Empty;
 
-            sonuc = siralamaAlani switch
-            {
-                "TekneAdi" => siralamaArtan ? sonuc.OrderBy(t => t.TekneAdi) : sonuc.OrderByDescending(t => t.TekneAdi),
-                "Durum" => siralamaArtan ? sonuc.OrderBy(t => t.Aktif) : sonuc.OrderByDescending(t => t.Aktif),
-                _ => siralamaArtan ? sonuc.OrderBy(t => t.TekneKodu) : sonuc.OrderByDescending(t => t.TekneKodu),
-            };
+        aramaCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        aramaCts = cts;
 
-            return sonuc;
+        var arama = aramaMetni.Trim();
+        if (string.IsNullOrEmpty(arama))
+        {
+            aramaSonuclari = null;
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            await using var db = await DbFactory.CreateDbContextAsync(cts.Token);
+            aramaSonuclari = await AramaSorgusu(db, arama).Take(AramaSonucLimiti).ToListAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Kullanıcı yazmaya devam etti, bu arama artık geçersiz.
         }
     }
 
-    private void SiralamayiDegistir(string alan)
+    private async Task AramaSonuclariniYenile()
+    {
+        var arama = aramaMetni.Trim();
+        if (string.IsNullOrEmpty(arama))
+        {
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        aramaSonuclari = await AramaSorgusu(db, arama).Take(AramaSonucLimiti).ToListAsync();
+    }
+
+    private async Task SiralamayiDegistir(string alan)
     {
         if (siralamaAlani == alan)
         {
@@ -152,25 +183,16 @@ else
             siralamaAlani = alan;
             siralamaArtan = true;
         }
+
+        await AramaSonuclariniYenile();
     }
 
     private string SiralamaIsareti(string alan) => siralamaAlani != alan ? "" : (siralamaArtan ? "▲" : "▼");
-
-    protected override async Task OnInitializedAsync()
-    {
-        await ListeyiYenile();
-    }
 
     private async Task<string?> AktifKullaniciAdi()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
         return authState.User?.Identity?.Name;
-    }
-
-    private async Task ListeyiYenile()
-    {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        tekneler = await db.Tekneler.OrderBy(t => t.TekneKodu).ToListAsync();
     }
 
     private void YeniTekneBaslat()
@@ -227,7 +249,7 @@ else
             db.MevcutKullanici = await AktifKullaniciAdi();
             await db.SaveChangesAsync();
             formAcik = false;
-            await ListeyiYenile();
+            await AramaSonuclariniYenile();
         }
         catch (DbUpdateException)
         {

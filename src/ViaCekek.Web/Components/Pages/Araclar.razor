@@ -46,11 +46,11 @@
         <div class="row">
             <div class="col-md-4 mb-2">
                 <label class="form-label">Takip Numarası</label>
-                <input class="form-control" @bind:get="duzenlenenArac.TakipNumarasi" @bind:set="v => duzenlenenArac.TakipNumarasi = MetinYardimci.BuyukHarf(v)!" @bind:event="oninput" autocomplete="off" />
-                @if (duzenlenenArac.Id == 0 && EslesenAraclar.Count > 0)
+                <input class="form-control" @bind:get="duzenlenenArac.TakipNumarasi" @bind:set="TakipNumarasiInputDegisti" @bind:event="oninput" autocomplete="off" />
+                @if (duzenlenenArac.Id == 0 && eslesenAraclarForm.Count > 0)
                 {
                     <div class="list-group mt-1">
-                        @foreach (var eslesen in EslesenAraclar)
+                        @foreach (var eslesen in eslesenAraclarForm)
                         {
                             <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => DuzenlemeBaslat(eslesen)">
                                 <strong>@eslesen.TakipNumarasi</strong> — @AracTuruAdi(eslesen.AracTuru)
@@ -152,21 +152,17 @@
 
 @if (!formAcik)
 {
-@if (araclar is null)
-{
-    <p>Yükleniyor...</p>
-}
-else if (araclar.Count == 0)
-{
-    <p>Henüz araç kaydı yok.</p>
-}
-else
-{
     <div class="mb-3">
-        <input type="search" class="form-control" style="max-width: 400px;" placeholder="Ara (takip no, araç türü, firma)..." @bind="aramaMetni" @bind:event="oninput" />
+        <input type="search" class="form-control" style="max-width: 400px;"
+               placeholder="Aramak için yazın (takip no, araç türü, firma)..."
+               @bind:get="aramaMetni" @bind:set="AramaDegisti" @bind:event="oninput" autocomplete="off" />
     </div>
 
-    @if (!GorunenAraclar.Any())
+    @if (aramaSonuclari is null)
+    {
+        <p>Aramak için yukarıya yazın.</p>
+    }
+    else if (aramaSonuclari.Count == 0)
     {
         <p>Aramanızla eşleşen kayıt bulunamadı.</p>
     }
@@ -184,7 +180,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var arac in GorunenAraclar)
+            @foreach (var arac in aramaSonuclari)
             {
                 <tr>
                     <td>@arac.TakipNumarasi</td>
@@ -212,14 +208,20 @@ else
         </tbody>
     </table>
     </div>
+    @if (aramaSonuclari.Count == AramaSonucLimiti)
+    {
+        <p class="text-muted">İlk @AramaSonucLimiti sonuç gösteriliyor — daha spesifik arayın.</p>
     }
-}
+    }
 }
 
 </div>
 
 @code {
-    private List<Arac>? araclar;
+    // Bkz. Kisiler.razor'daki aynı not: büyük tabloda tam liste yüklemesi
+    // yerine arama-öncelikli, sunucu tarafı debounce'lu sorgu deseni.
+    private const int AramaSonucLimiti = 50;
+
     private List<string> firmaOnerileri = [];
     private Arac duzenlenenArac = new();
     private bool formAcik;
@@ -228,45 +230,88 @@ else
     private bool basariUyariMi;
 
     private string aramaMetni = string.Empty;
+    private List<Arac>? aramaSonuclari;
+    private CancellationTokenSource? aramaCts;
     private string siralamaAlani = "TakipNumarasi";
     private bool siralamaArtan = true;
 
-    private List<Arac> EslesenAraclar =>
-        string.IsNullOrWhiteSpace(duzenlenenArac.TakipNumarasi) || araclar is null
-            ? []
-            : araclar
-                .Where(a => a.TakipNumarasi.Contains(duzenlenenArac.TakipNumarasi.Trim(), StringComparison.OrdinalIgnoreCase))
-                .Take(5)
-                .ToList();
+    private List<Arac> eslesenAraclarForm = [];
+    private CancellationTokenSource? takipAramaCts;
 
-    private IEnumerable<Arac> GorunenAraclar
+    private IQueryable<Arac> AramaSorgusu(ApplicationDbContext db, string arama)
     {
-        get
+        // Araç türü Türkçe adıyla da aranabilsin diye her tür için ayrı bir
+        // bool önceden hesaplanıyor (AracTuruAdi() bir C# metodu, doğrudan
+        // SQL'e çevrilemiyor). Bilerek List<AracTuru>.Contains(...) KULLANILMIYOR
+        // — EF Core 8 bunu OPENJSON'a çeviriyor, gerçek sunucu SQL Server 2014
+        // olduğu için OPENJSON desteklemiyor ve sorgu her seferinde
+        // "Incorrect syntax near the keyword 'WITH'" ile çöküyordu (gerçek DB'ye
+        // karşı doğrulanan bir bug, 2026-08-25). Tek tek eşitlik kontrolü hem
+        // basit SQL üretiyor hem 5 sabit türde performans sorunu yaratmıyor.
+        var aracEslesir = AracTuruAdi(AracTuru.Arac).Contains(arama, StringComparison.OrdinalIgnoreCase);
+        var vincEslesir = AracTuruAdi(AracTuru.Vinc).Contains(arama, StringComparison.OrdinalIgnoreCase);
+        var vidanjorEslesir = AracTuruAdi(AracTuru.Vidanjor).Contains(arama, StringComparison.OrdinalIgnoreCase);
+        var kompresorEslesir = AracTuruAdi(AracTuru.Kompresor).Contains(arama, StringComparison.OrdinalIgnoreCase);
+        var basincliKapEslesir = AracTuruAdi(AracTuru.BasincliKap).Contains(arama, StringComparison.OrdinalIgnoreCase);
+
+        var sorgu = db.Araclar.AsNoTracking().Where(a =>
+            a.TakipNumarasi.Contains(arama) ||
+            (a.FirmaAdi != null && a.FirmaAdi.Contains(arama)) ||
+            (aracEslesir && a.AracTuru == AracTuru.Arac) ||
+            (vincEslesir && a.AracTuru == AracTuru.Vinc) ||
+            (vidanjorEslesir && a.AracTuru == AracTuru.Vidanjor) ||
+            (kompresorEslesir && a.AracTuru == AracTuru.Kompresor) ||
+            (basincliKapEslesir && a.AracTuru == AracTuru.BasincliKap));
+
+        return siralamaAlani switch
         {
-            IEnumerable<Arac> sonuc = araclar ?? [];
+            "AracTuru" => siralamaArtan ? sorgu.OrderBy(a => a.AracTuru) : sorgu.OrderByDescending(a => a.AracTuru),
+            "FirmaAdi" => siralamaArtan ? sorgu.OrderBy(a => a.FirmaAdi) : sorgu.OrderByDescending(a => a.FirmaAdi),
+            "Durum" => siralamaArtan ? sorgu.OrderBy(a => a.Aktif) : sorgu.OrderByDescending(a => a.Aktif),
+            _ => siralamaArtan ? sorgu.OrderBy(a => a.TakipNumarasi) : sorgu.OrderByDescending(a => a.TakipNumarasi),
+        };
+    }
 
-            if (!string.IsNullOrWhiteSpace(aramaMetni))
-            {
-                var arama = aramaMetni.Trim();
-                sonuc = sonuc.Where(a =>
-                    (a.TakipNumarasi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (a.FirmaAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    AracTuruAdi(a.AracTuru).Contains(arama, StringComparison.OrdinalIgnoreCase));
-            }
+    private async Task AramaDegisti(string? v)
+    {
+        aramaMetni = v ?? string.Empty;
 
-            sonuc = siralamaAlani switch
-            {
-                "AracTuru" => siralamaArtan ? sonuc.OrderBy(a => AracTuruAdi(a.AracTuru)) : sonuc.OrderByDescending(a => AracTuruAdi(a.AracTuru)),
-                "FirmaAdi" => siralamaArtan ? sonuc.OrderBy(a => a.FirmaAdi) : sonuc.OrderByDescending(a => a.FirmaAdi),
-                "Durum" => siralamaArtan ? sonuc.OrderBy(a => a.Aktif) : sonuc.OrderByDescending(a => a.Aktif),
-                _ => siralamaArtan ? sonuc.OrderBy(a => a.TakipNumarasi) : sonuc.OrderByDescending(a => a.TakipNumarasi),
-            };
+        aramaCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        aramaCts = cts;
 
-            return sonuc;
+        var arama = aramaMetni.Trim();
+        if (string.IsNullOrEmpty(arama))
+        {
+            aramaSonuclari = null;
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            await using var db = await DbFactory.CreateDbContextAsync(cts.Token);
+            aramaSonuclari = await AramaSorgusu(db, arama).Take(AramaSonucLimiti).ToListAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Kullanıcı yazmaya devam etti, bu arama artık geçersiz.
         }
     }
 
-    private void SiralamayiDegistir(string alan)
+    private async Task AramaSonuclariniYenile()
+    {
+        var arama = aramaMetni.Trim();
+        if (string.IsNullOrEmpty(arama))
+        {
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        aramaSonuclari = await AramaSorgusu(db, arama).Take(AramaSonucLimiti).ToListAsync();
+    }
+
+    private async Task SiralamayiDegistir(string alan)
     {
         if (siralamaAlani == alan)
         {
@@ -277,9 +322,49 @@ else
             siralamaAlani = alan;
             siralamaArtan = true;
         }
+
+        await AramaSonuclariniYenile();
     }
 
     private string SiralamaIsareti(string alan) => siralamaAlani != alan ? "" : (siralamaArtan ? "▲" : "▼");
+
+    private async Task TakipNumarasiInputDegisti(string? v)
+    {
+        duzenlenenArac.TakipNumarasi = MetinYardimci.BuyukHarf(v)!;
+
+        takipAramaCts?.Cancel();
+
+        if (duzenlenenArac.Id != 0)
+        {
+            eslesenAraclarForm = [];
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        takipAramaCts = cts;
+
+        var arama = duzenlenenArac.TakipNumarasi.Trim();
+        if (string.IsNullOrEmpty(arama))
+        {
+            eslesenAraclarForm = [];
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(200, cts.Token);
+            await using var db = await DbFactory.CreateDbContextAsync(cts.Token);
+            eslesenAraclarForm = await db.Araclar.AsNoTracking()
+                .Where(a => a.TakipNumarasi.Contains(arama))
+                .OrderBy(a => a.TakipNumarasi)
+                .Take(5)
+                .ToListAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Kullanıcı yazmaya devam etti, bu arama artık geçersiz.
+        }
+    }
 
     private List<BelgeDurumSatiri>? belgeDurumSatirlari;
 
@@ -298,11 +383,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await ListeyiYenile();
+        await FirmaOnerileriYukle();
 
         if (SorguDuzenleId is int id)
         {
-            var arac = araclar?.FirstOrDefault(a => a.Id == id);
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var arac = await db.Araclar.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
             if (arac is not null)
             {
                 await DuzenlemeBaslat(arac);
@@ -321,10 +407,9 @@ else
         return authState.User?.Identity?.Name;
     }
 
-    private async Task ListeyiYenile()
+    private async Task FirmaOnerileriYukle()
     {
         await using var db = await DbFactory.CreateDbContextAsync();
-        araclar = await db.Araclar.OrderBy(a => a.TakipNumarasi).ToListAsync();
         firmaOnerileri = await db.Araclar
             .Where(a => a.FirmaAdi != null && a.FirmaAdi != "")
             .Select(a => a.FirmaAdi!)
@@ -346,6 +431,8 @@ else
     private async Task YeniAracBaslat()
     {
         duzenlenenArac = new Arac { Aktif = true };
+        eslesenAraclarForm = [];
+        takipAramaCts?.Cancel();
         hataMesaji = null;
         basariMesaji = null;
         formAcik = true;
@@ -354,6 +441,8 @@ else
 
     private async Task DuzenlemeBaslat(Arac arac)
     {
+        eslesenAraclarForm = [];
+        takipAramaCts?.Cancel();
         duzenlenenArac = new Arac
         {
             Id = arac.Id,
@@ -506,7 +595,8 @@ else
 
             db.MevcutKullanici = await AktifKullaniciAdi();
             await db.SaveChangesAsync();
-            await ListeyiYenile();
+            await FirmaOnerileriYukle();
+            await AramaSonuclariniYenile();
 
             basariUyariMi = uyariBelgeleri.Count > 0;
             var mesaj = basariUyariMi
@@ -518,6 +608,8 @@ else
                 // Yeni kayıt butonuna basılmış gibi ekran temizlenir — art
                 // arda hızlı veri girişine izin vermek için.
                 duzenlenenArac = new Arac { Aktif = true };
+                eslesenAraclarForm = [];
+                takipAramaCts?.Cancel();
                 await BelgeDurumlariniYukle(null, duzenlenenArac.AracTuru);
             }
             else

@@ -160,6 +160,42 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Performans: Kişiler/Araçlar/Tekneler arama-öncelikli hale getirildi
+  (2026-08-25)**. Eski sistemden büyük hacimli veri aktarımı sonrası
+  (`Kisiler` 21.630, `Araclar` 950, `Tekneler` 6.663 satır) bu üç ekran
+  her ziyarette **tüm tabloyu** belleğe çekip içinde filtreleme
+  yapıyordu — gerçek DB'ye karşı ölçüldü: `/kisiler` sayfa açılışı
+  ortalama **~750ms** (400ms-1.1sn arası). Kullanıcı "kişi aramada
+  yavaşlık var" diye bildirdi. **Çözüm**: üç ekran de artık sayfa
+  açılışında hiçbir şey yüklemiyor — kullanıcı arama kutusuna yazana
+  kadar "Aramak için yukarıya yazın" placeholder'ı gösteriliyor; yazınca
+  (`/cekektakip`'teki Kimlik/Takip No aramasındaki gibi) 250ms debounce +
+  `CancellationTokenSource` ile sunucu tarafında `Where` + `OrderBy` +
+  `Take(50)` sorgusu çalışıyor. Sütun başlıklarına tıklayarak sıralama da
+  artık bellek içi değil sunucu tarafı (aynı sorgu farklı `OrderBy` ile
+  tekrar çalıştırılıyor). Kişi/Araç formlarındaki "bu numarayla kayıt
+  zaten var" tekrar-kontrolü de aynı şekilde debounce'lu DB sorgusuna
+  çevrildi (önceden önceden-yüklenmiş listede bellek içi arıyordu).
+  Gerçek DB'ye karşı ölçüldü: Kişiler araması ~119ms ortalama (ısındıktan
+  sonra ~10ms'ler), Tekneler ~21ms ortalama — eski ~750ms'e göre büyük
+  iyileşme; `Take(50)` sınırı ve sıralama ayrıca doğrulandı.
+  **Bug + düzeltme (aynı gün)**: Araçlar'daki "araç türünü Türkçe adıyla
+  da ara" özelliği için ilk yazılan `List<AracTuru>.Contains(a.AracTuru)`
+  ifadesi, EF Core 8'in bunu `OPENJSON` kullanarak SQL'e çevirmesi
+  yüzünden **gerçek prodüksiyon sunucusunda** (SQL Server 2014 —
+  `OPENJSON` 2016'da eklendi, bu sürümde hiç yok) her aramada
+  `"Incorrect syntax near the keyword 'WITH'"` hatasıyla çöküyordu; bu,
+  gerçek DB'ye karşı test edilirken yakalandı (yerel/geliştirme ortamı
+  daha yeni bir SQL Server sürümü kullandığı için build/derleme hiçbir
+  şey göstermiyordu — yalnızca gerçek sunucuya karşı ortaya çıkan bir
+  hataydı). **Çözüm**: `List<T>.Contains(...)` yerine 5 sabit araç türü
+  için tek tek `(eslesirBool && a.AracTuru == Deger)` karşılaştırması
+  kullanıldı — basit `OR` zinciri üretiyor, `OPENJSON` gerekmiyor.
+  **Ders**: LINQ'te `List<T>.Contains(dbSütunu)` deseni (herhangi bir
+  koleksiyon üzerinde, sadece enum değil) production sunucusunun gerçek
+  SQL Server sürümüyle mutlaka test edilmeli — yerel ortamda sorunsuz
+  görünüp gerçek sunucuda çökebiliyor.
+
 - **Tekne alanı aranabilir yapıldı (2026-08-24)**: `/cekektakip` Onay
   aşamasındaki Tekne `<select>` dropdown'u, Kimlik/Takip No alanlarıyla
   aynı desende arama-kutusu + tıklanabilir sonuç listesine çevrildi
@@ -627,7 +663,11 @@ durdurur ve uyarı gösterir:
 - **Firma Adı, Telefon**: düzenlenebilir — değişmiş olabilir. Kaydet'te
   hem `CekekTakipleri`ye (o günkü anlık görüntü) hem de ilgili `Kisi`
   kaydına yazılır (kişi kaydı da güncellenmiş olur).
-- **Tekne**: opsiyonel dropdown (`CekekTakip.TekneId`).
+- **Tekne**: arama kutusu (`CekekTakip.TekneId`) — **zorunlu**
+  (2026-08-25'ten itibaren, hem kişi hem araç girişinde; seçilmeden
+  "Giriş Kaydet" engellenir). DB kolonu hâlâ nullable (eski kayıtlar
+  ve şema geriye dönük uyum için), zorunluluk yalnızca uygulama
+  katmanında `GirisKaydet()` içinde kontrol ediliyor.
 - Kaydet → `CekekTakipleri`ye giriş satırı düşülür (GirişTarihi/
   GirişSaati = şimdi, ZiyaretSebebi Aşama 1'den, snapshot alanları +
   TekneId, işlemi yapan kullanıcı audit alanlarından), ardından
