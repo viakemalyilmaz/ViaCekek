@@ -177,6 +177,10 @@ else
         {
             parcalar.Add($"Tekne: {kayit.Tekne.TekneKodu} — {kayit.Tekne.TekneAdi}");
         }
+        if (!string.IsNullOrWhiteSpace(kayit.Telefon))
+        {
+            parcalar.Add(kayit.Telefon);
+        }
         return string.Join(" · ", parcalar);
     }
 

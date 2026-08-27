@@ -212,7 +212,7 @@ else if (asama == Asama.Onay)
                 <input class="form-control form-control-lg" @bind:get="onayFirmaAdi" @bind:set="v => onayFirmaAdi = MetinYardimci.BuyukHarf(v)" @bind:event="oninput" />
             </div>
             <div class="col-md-4 mb-2">
-                <label class="form-label">Telefon</label>
+                <label class="form-label">Telefon <span class="text-danger">*</span></label>
                 <input class="form-control form-control-lg" @bind:get="onayTelefon" @bind:set="v => onayTelefon = v" @bind:event="oninput" placeholder="5XXXXXXXXX" />
             </div>
         </div>
@@ -712,6 +712,12 @@ else if (asama == Asama.Onay)
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(onayTelefon))
+        {
+            hataMesaji = "Telefon zorunlu.";
+            return;
+        }
+
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
@@ -720,23 +726,19 @@ else if (asama == Asama.Onay)
             var sure = SureLimiti(ziyaretSebebi);
             DateTime? beklenenBitis = sure is null ? null : simdi.Add(sure.Value);
 
+            // Firma Adı/Telefon burada yalnızca o günkü Çekek Takip kaydının
+            // anlık görüntüsüne (snapshot) yazılır — artık Kisi/Arac kaydına
+            // geri senkronize edilmiyor (2026-08-26'dan itibaren, bilerek:
+            // kullanıcı bu alanı yanlışlıkla boşaltırsa kişinin/aracın asıl
+            // kaydındaki bilgi silinmiş oluyordu). Kişi/Araç bilgisini
+            // güncellemek için hâlâ /kisiler ve /araclar ekranları kullanılır.
             if (bulunanKisi is not null)
             {
-                // bulunanKisi, KontrolYap'ta AsNoTracking ile okundu (başka
-                // sekmelerde yapılan güncellemeleri anında görebilmek için) —
-                // kaydetmeden önce izlenebilir (tracked) taze bir kopya çekilir.
-                var kisi = await db.Kisiler.FindAsync(bulunanKisi.Id);
-                if (kisi is null)
-                {
-                    hataMesaji = "Kişi bulunamadı, sayfayı yenileyin.";
-                    return;
-                }
-
                 var kisiGiris = new ViaCekek.Web.Models.CekekTakip
                 {
-                    KisiId = kisi.Id,
-                    KimlikNumarasi = kisi.KimlikNumarasi,
-                    AdSoyad = kisi.AdSoyad,
+                    KisiId = bulunanKisi.Id,
+                    KimlikNumarasi = bulunanKisi.KimlikNumarasi,
+                    AdSoyad = bulunanKisi.AdSoyad,
                     FirmaAdi = onayFirmaAdi,
                     Telefon = onayTelefon,
                     TekneId = onayTekneId,
@@ -748,27 +750,17 @@ else if (asama == Asama.Onay)
                     Aciklama = onayAciklama
                 };
                 db.CekekTakipleri.Add(kisiGiris);
-
-                kisi.FirmaAdi = onayFirmaAdi;
-                kisi.Telefon = onayTelefon;
             }
 
             if (bulunanArac is not null)
             {
-                var arac = await db.Araclar.FindAsync(bulunanArac.Id);
-                if (arac is null)
-                {
-                    hataMesaji = "Araç bulunamadı, sayfayı yenileyin.";
-                    return;
-                }
-
-                var aracSure = AracSureLimiti(arac.AracTuru);
+                var aracSure = AracSureLimiti(bulunanArac.AracTuru);
                 DateTime? aracBeklenenBitis = aracSure is null ? null : simdi.Add(aracSure.Value);
 
                 var aracGiris = new ViaCekek.Web.Models.CekekTakip
                 {
-                    AracId = arac.Id,
-                    TakipNumarasi = arac.TakipNumarasi,
+                    AracId = bulunanArac.Id,
+                    TakipNumarasi = bulunanArac.TakipNumarasi,
                     AdSoyad = bulunanKisi?.AdSoyad,
                     FirmaAdi = onayFirmaAdi,
                     Telefon = onayTelefon,
@@ -781,8 +773,6 @@ else if (asama == Asama.Onay)
                     Aciklama = onayAciklama
                 };
                 db.CekekTakipleri.Add(aracGiris);
-
-                arac.FirmaAdi = onayFirmaAdi;
             }
 
             db.MevcutKullanici = await AktifKullaniciAdi();
