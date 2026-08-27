@@ -4,19 +4,21 @@
 <div class="app-shell">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
     <a class="navbar-brand" href="/">ViaÇekek</a>
+    <div class="navbar-nav navbar-nav-priority flex-row">
+        <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")">
+            <Authorized>
+                <a class="nav-link" href="cekektakip">Çekek Takip</a>
+                <a class="nav-link" href="kisiler">Kişiler</a>
+                <a class="nav-link" href="araclar">Araçlar</a>
+            </Authorized>
+        </AuthorizeView>
+    </div>
     <input class="navbar-toggle-checkbox" type="checkbox" id="ana-menu-toggle" />
     <label class="navbar-toggler" for="ana-menu-toggle" aria-label="Menüyü aç/kapat">
         <span class="navbar-toggler-icon"></span>
     </label>
     <div class="collapse navbar-collapse">
         <div class="navbar-nav me-auto">
-            <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")">
-                <Authorized>
-                    <a class="nav-link" href="cekektakip">Çekek Takip</a>
-                    <a class="nav-link" href="kisiler">Kişiler</a>
-                    <a class="nav-link" href="araclar">Araçlar</a>
-                </Authorized>
-            </AuthorizeView>
             <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru}")">
                 <Authorized>
                     <a class="nav-link" href="tekneler">Tekneler</a>

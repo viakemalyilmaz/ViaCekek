@@ -23,6 +23,46 @@
     pointer-events: none;
 }
 
+/* Çekek Takip / Kişiler / Araçlar: ekran daraldığında hamburger'a
+   gizlenmesin diye .navbar-collapse dışında, her zaman görünür tutulur
+   (bkz. CLAUDE.md). Bootstrap'ın .navbar-nav .nav-link'e yatay padding'i
+   yalnızca .navbar-expand-lg aktifken (992px+) verdiği fark edildi —
+   altında padding 0'a düşüp linkler bitişik görünüyordu, burada
+   genişlik ne olursa olsun sabit padding veriliyor. flex-wrap: nowrap +
+   white-space: nowrap ile üç link kendi içinde asla ikiye bölünmüyor —
+   sığmazsa (çok dar telefon genişliğinde) grup bir bütün olarak alt
+   satıra kayar, tek link ortada kalmaz.
+*/
+.navbar-nav-priority {
+    margin-left: 0.75rem;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.navbar-nav-priority .nav-link {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    white-space: nowrap;
+}
+
+/* Geniş ekranda (992px+) .navbar-collapse'daki linkler tek satırda
+   yan yana geliyor; iki kelimeli linkler (örn. "Kişi Belgeleri") satırı
+   gerip tek kelimelik linklerin (Tekneler, Yardım) üste yapışık kalmasına
+   sebep oluyordu — dikey ortalama ile düzeltildi. */
+@media (min-width: 992px) {
+    .navbar-collapse .navbar-nav {
+        align-items: center;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .navbar-nav-priority .nav-link {
+        padding-left: 0.4rem;
+        padding-right: 0.4rem;
+        font-size: 0.9rem;
+    }
+}
+
 @media (max-width: 991.98px) {
     .navbar-toggle-checkbox:checked ~ .navbar-collapse {
         display: block;
