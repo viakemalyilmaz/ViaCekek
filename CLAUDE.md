@@ -125,6 +125,26 @@ tek taraflı yapılmaz.
   açılıp kapanıyor; bu nedenle statik render edilen Identity/Account
   sayfalarında da çalışıyor. Menü sırası: Kişiler, Araçlar,
   Tekneler, Kişi Belgeleri, Araç Belgeleri, (Yönetici-only) Kullanıcılar.
+- **Öncelikli linkler her zaman görünür (2026-08-27)**: Çekek Takip,
+  Kişiler, Araçlar linkleri artık `.navbar-collapse`'ın (hamburger'a
+  gizlenen bölüm) **dışında**, `navbar-nav-priority` adında ayrı bir
+  grupta — ekran daralıp hamburger devreye girdiğinde bile her zaman
+  görünür kalıyorlar; yalnızca geri kalan linkler (Tekneler, Kişi/Araç
+  Belgeleri, Raporlar, Kullanıcılar) gizleniyor. Kullanıcının gerçek
+  cihazda (telefon yatay, tablet) test etmesiyle iki görsel bug bulunup
+  düzeltildi: (1) Bootstrap'ın `.navbar-nav .nav-link`'e yatay padding'i
+  yalnızca `.navbar-expand-lg` aktifken (992px+) verdiği ortaya çıktı —
+  altında padding 0'a düşüp öncelikli linkler bitişik görünüyordu, sabit
+  padding eklenerek çözüldü; (2) geniş ekranda (992px+) iki kelimeli
+  linkler (örn. "Kişi Belgeleri") satırı gerip tek kelimelik linklerin
+  (Tekneler, Yardım) üste yapışık kalmasına sebep oluyordu,
+  `align-items: center` ile düzeltildi. **Ders**: navbar gibi çok
+  bileşenli responsive düzenlerde Bootstrap'ın breakpoint-scoped
+  padding/hizalama kurallarına güvenmeyip (özellikle standart yapının
+  dışına çıkıldığında, örn. linkleri `.navbar-collapse` dışına taşımak
+  gibi) gerçek cihaz/DevTools testiyle doğrulamak gerekiyor — build
+  hatasız geçse bile CSS düzen sorunları yalnızca görsel test ile
+  ortaya çıkıyor.
 
 ## Ortak Kurallar (Tüm Tablolar İçin)
 
@@ -159,6 +179,30 @@ Tüm tanım/kural ekranları, Çekek Takip (Kişi + Araç Girişi), Board,
 Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
+
+- **Kisi/Arac senkronizasyonu kaldırıldı, Telefon zorunlu oldu, Board'da
+  telefon gösteriliyor (2026-08-26)**: Kullanıcı sahada şunu fark etti —
+  Çekek Takip Onay ekranında Telefon alanı yanlışlıkla boşaltılıp
+  "Giriş Kaydet"e basılırsa, o boş değer kişinin `Kisiler` kaydındaki
+  asıl telefon numarasının da silinmesine sebep oluyordu (önceki
+  tasarımda Firma Adı/Telefon bilerek hem `CekekTakipleri`ye hem `Kisi`/
+  `Arac` kaydına yazılıyordu — "bilgi güncel tutulsun" amacıyla, ama
+  koşulsuz senkronizasyon istenmeyen veri kaybına açıktı). **Çözüm**:
+  `GirisKaydet()`'te artık Firma Adı/Telefon **yalnızca** o günkü
+  `CekekTakipleri` satırına (anlık görüntü) yazılıyor, `Kisi`/`Arac`
+  kaydına hiç dokunulmuyor — kişi/araç bilgisini kalıcı güncellemek için
+  hâlâ `/kisiler`/`/araclar` ekranları kullanılır. Bu değişiklik ayrıca
+  kodu sadeleştirdi: `bulunanKisi`/`bulunanArac` (KontrolYap'ta zaten
+  `AsNoTracking` ile okunmuştu) artık kaydetmeden önce ayrıca izlenebilir
+  kopya olarak yeniden çekilmiyor (değiştirilmeyecekleri için gerek
+  kalmadı), "Kişi/Araç bulunamadı" ara kontrolü kaldırıldı (aykırı durum
+  zaten `DbUpdateException` ile yakalanıyor). Aynı zamanda **Telefon**
+  Tekne ile aynı desende **zorunlu** yapıldı (boşsa "Giriş Kaydet"
+  engellenir, "Telefon zorunlu." uyarısı gösterilir). **Board** kart
+  alt bilgisine (`AltBilgi()`) Telefon eklendi. Gerçek DB'ye karşı
+  scratch script'le doğrulandı: farklı bir Telefon/Firma Adı ile giriş
+  yapıldığında `CekekTakipleri` satırı doğru yeni değerleri tutarken
+  `Kisi.Telefon`/`Kisi.FirmaAdi`/`Arac.FirmaAdi` hiç değişmeden kaldı.
 
 - **Performans: Kişiler/Araçlar/Tekneler arama-öncelikli hale getirildi
   (2026-08-25)**. Eski sistemden büyük hacimli veri aktarımı sonrası
@@ -660,9 +704,16 @@ durdurur ve uyarı gösterir:
 **Aşama 2 — Onay**: 
 - **Ad Soyad**: salt okunur (Kişi kaydından), yalnızca `/kisiler`
   ekranından değiştirilebilir.
-- **Firma Adı, Telefon**: düzenlenebilir — değişmiş olabilir. Kaydet'te
-  hem `CekekTakipleri`ye (o günkü anlık görüntü) hem de ilgili `Kisi`
-  kaydına yazılır (kişi kaydı da güncellenmiş olur).
+- **Firma Adı, Telefon**: düzenlenebilir. **Telefon zorunlu**
+  (2026-08-26'dan itibaren, hem kişi hem araç girişinde; boş bırakılırsa
+  "Giriş Kaydet" engellenir — Tekne ile aynı desende). Kaydet'te bu
+  alanlar yalnızca `CekekTakipleri`ye (o günkü anlık görüntü) yazılır —
+  **artık `Kisi`/`Arac` kaydına geri senkronize edilmiyor** (önceden
+  ediliyordu, 2026-08-26'da kaldırıldı: kullanıcı Telefon alanını
+  yanlışlıkla boşaltıp kaydettiğinde kişinin asıl kayıtlı telefon
+  numarası da siliniyordu — bkz. altta "Kisi/Arac senkronizasyonu
+  kaldırıldı" notu). Kişi/Araç bilgisini kalıcı güncellemek için hâlâ
+  `/kisiler` ve `/araclar` ekranları kullanılır.
 - **Tekne**: arama kutusu (`CekekTakip.TekneId`) — **zorunlu**
   (2026-08-25'ten itibaren, hem kişi hem araç girişinde; seçilmeden
   "Giriş Kaydet" engellenir). DB kolonu hâlâ nullable (eski kayıtlar
