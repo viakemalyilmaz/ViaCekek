@@ -78,13 +78,26 @@
 
         <div class="col-md-4">
             <label class="form-label">Tekne</label>
-            <select class="form-select" @bind="tekneIdFiltre">
-                <option value="">Tümü</option>
-                @foreach (var tekne in tekneler)
+            <div class="d-flex align-items-center gap-2">
+                <input class="form-control"
+                       @bind:get="tekneArama" @bind:set="TekneAramaDegisti" @bind:event="oninput"
+                       autocomplete="off" placeholder="Tekne kodu veya adı ile ara..." />
+                @if (tekneIdFiltre is not null)
                 {
-                    <option value="@tekne.Id">@tekne.TekneKodu — @tekne.TekneAdi</option>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="TekneSecimiTemizle">✕</button>
                 }
-            </select>
+            </div>
+            @if (eslesenTekneler.Count > 0)
+            {
+                <div class="list-group mt-1">
+                    @foreach (var tekne in eslesenTekneler)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action py-1" @onclick="() => TekneSec(tekne)">
+                            <strong>@tekne.TekneKodu</strong> — @tekne.TekneAdi
+                        </button>
+                    }
+                </div>
+            }
         </div>
 
         <div class="col-md-4">
@@ -120,19 +133,7 @@
             </div>
         </div>
 
-        <div class="col-md-4">
-            <label class="form-label">Kaydeden</label>
-            <div class="input-group">
-                <select class="form-select" style="max-width: 140px;" @bind="kaydedenFiltre.Operator">
-                    <option value="@MetinOperatoru.Icerir">İçerir</option>
-                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
-                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
-                </select>
-                <input class="form-control" @bind="kaydedenFiltre.Deger" />
-            </div>
-        </div>
-
-        <div class="col-md-6">
+        <div class="col-md-8">
             <label class="form-label">Giriş Tarihi</label>
             <div class="d-flex gap-2 flex-wrap align-items-center">
                 <select class="form-select" style="max-width: 130px;" @bind="girisTarihiFiltre.Operator">
@@ -150,7 +151,19 @@
             </div>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
+            <label class="form-label">Kaydeden</label>
+            <div class="input-group">
+                <select class="form-select" style="max-width: 140px;" @bind="kaydedenFiltre.Operator">
+                    <option value="@MetinOperatoru.Icerir">İçerir</option>
+                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
+                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
+                </select>
+                <input class="form-control" @bind="kaydedenFiltre.Deger" />
+            </div>
+        </div>
+
+        <div class="col-md-8">
             <label class="form-label">Çıkış Tarihi</label>
             <div class="d-flex gap-2 flex-wrap align-items-center">
                 <select class="form-select" style="max-width: 130px;" @bind="cikisTarihiFiltre.Operator">
@@ -266,6 +279,8 @@ else
     private TarihFiltre cikisTarihiFiltre = new();
     private AracTuru? aracTuruFiltre;
     private int? tekneIdFiltre;
+    private string tekneArama = string.Empty;
+    private List<Tekne> eslesenTekneler = [];
     private ZiyaretSebebi? ziyaretSebebiFiltre;
     private CekekTakipDurumu? durumFiltre;
 
@@ -458,9 +473,45 @@ else
         cikisTarihiFiltre = new();
         aracTuruFiltre = null;
         tekneIdFiltre = null;
+        tekneArama = string.Empty;
+        eslesenTekneler = [];
         ziyaretSebebiFiltre = null;
         durumFiltre = null;
         sonuclar = null;
+    }
+
+    // /cekektakip'teki Tekne arama alanıyla aynı desen: tekneler zaten
+    // OnInitializedAsync'te belleğe yüklü olduğu için yeni bir DB sorgusu
+    // gerekmiyor, filtreleme bellek içinde yapılıyor. tekneIdFiltre her
+    // yazışta null'a çekilir — geçerli bir Id yalnızca listeden TekneSec
+    // ile tıklanarak seçildiğinde set edilir.
+    private void TekneAramaDegisti(string? v)
+    {
+        tekneArama = v ?? string.Empty;
+        tekneIdFiltre = null;
+
+        var arama = tekneArama.Trim();
+        eslesenTekneler = string.IsNullOrEmpty(arama)
+            ? []
+            : tekneler
+                .Where(t => t.TekneKodu.Contains(arama, StringComparison.OrdinalIgnoreCase)
+                         || t.TekneAdi.Contains(arama, StringComparison.OrdinalIgnoreCase))
+                .Take(8)
+                .ToList();
+    }
+
+    private void TekneSec(Tekne tekne)
+    {
+        tekneIdFiltre = tekne.Id;
+        tekneArama = $"{tekne.TekneKodu} — {tekne.TekneAdi}";
+        eslesenTekneler = [];
+    }
+
+    private void TekneSecimiTemizle()
+    {
+        tekneIdFiltre = null;
+        tekneArama = string.Empty;
+        eslesenTekneler = [];
     }
 
     private async Task ExcelAktar()

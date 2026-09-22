@@ -29,42 +29,43 @@
                 </div>
                 <div class="form-floating mb-3">
                     <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="şifre" />
-                    <label for="password" class="form-label">@(Input.SifreDegistirModu ? "Mevcut Şifre" : "Şifre")</label>
+                    <label for="password" class="form-label">Şifre</label>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
 
-                <div class="form-check mb-3">
-                    <InputCheckbox @bind-Value="Input.SifreDegistirModu" class="form-check-input" id="sifreDegistirModu" />
+                @* Statik (interaktif olmayan) bir sayfa olduğu için checkbox'ın
+                   işaretlenmesi sunucuya bildirilmeden tarayıcıda hemen yansımalı
+                   — bu yüzden alanlar/butonlar @if ile değil, saf CSS
+                   (:has() ile checked durumu, navbar hamburger menüsündeki
+                   :checked ~ deseninin aynı fikri) ile gösterilip gizleniyor;
+                   ikisi de DOM'da her zaman var. *@
+                <div class="form-check mb-3 login-sifre-toggle-satiri">
+                    <InputCheckbox @bind-Value="Input.SifreDegistirModu" class="form-check-input login-sifre-toggle" id="sifreDegistirModu" />
                     <label class="form-check-label" for="sifreDegistirModu">Şifremi değiştirmek istiyorum</label>
                 </div>
 
-                @if (Input.SifreDegistirModu)
-                {
-                    <div class="form-floating mb-3">
-                        <InputText type="password" @bind-Value="Input.YeniSifre" class="form-control" autocomplete="new-password" aria-required="true" placeholder="yeni şifre" />
-                        <label for="yeniSifre" class="form-label">Yeni Şifre</label>
-                    </div>
-                }
-                else
-                {
-                    <div class="checkbox mb-3">
-                        <label class="form-label">
-                            <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
-                            Beni hatırla
-                        </label>
-                    </div>
-                }
-
-                <div>
-                    <button type="submit" class="w-100 btn btn-lg btn-primary">@(Input.SifreDegistirModu ? "Şifre Değiştir" : "Giriş Yap")</button>
+                <div class="login-yeni-sifre-alani form-floating mb-3">
+                    <InputText type="password" @bind-Value="Input.YeniSifre" class="form-control" autocomplete="new-password" placeholder="yeni şifre" id="yeniSifre" />
+                    <label for="yeniSifre" class="form-label">Yeni Şifre</label>
                 </div>
 
-                @if (!Input.SifreDegistirModu)
-                {
-                    <p class="text-muted mt-3">
-                        Şifrenizi unuttuysanız yöneticinizle iletişime geçin.
-                    </p>
-                }
+                <div class="login-varsayilan-alan checkbox mb-3">
+                    <label class="form-label">
+                        <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
+                        Beni hatırla
+                    </label>
+                </div>
+
+                <div class="login-giris-butonu">
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">Giriş Yap</button>
+                </div>
+                <div class="login-sifre-degistir-butonu">
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">Şifre Değiştir</button>
+                </div>
+
+                <p class="login-varsayilan-alan text-muted mt-3">
+                    Şifrenizi unuttuysanız yöneticinizle iletişime geçin.
+                </p>
             </EditForm>
         </section>
     </div>

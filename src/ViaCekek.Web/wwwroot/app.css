@@ -150,3 +150,27 @@ h1:focus {
 .board-avatar-arac {
     background-color: #fd7e14;
 }
+
+/* Login: "Şifremi değiştirmek istiyorum" checkbox'ı ile alan/buton
+   göster-gizle — sayfa statik (interaktif olmayan) render edildiği için
+   Blazor @if sunucu round-trip'i olmadan tepki veremez. Checkbox kendi
+   Bootstrap .form-check div'inin İÇİNDE olduğu için (label ile birlikte,
+   hizalama bozulmasın diye) düz kardeş (~) seçici checkbox'ın DIŞINDAki
+   elemanlara ulaşamıyor — bu yüzden navbar hamburger menüsündeki gibi
+   düz :checked ~ değil, sarmalayan satırın durumunu okuyan :has()
+   kullanılıyor (proje yalnızca modern Chromium hedefliyor, bkz.
+   CLAUDE.md > Varsayımlar — :has() orada sorunsuz destekleniyor). */
+.login-yeni-sifre-alani,
+.login-sifre-degistir-butonu {
+    display: none;
+}
+
+.login-sifre-toggle-satiri:has(.login-sifre-toggle:checked) ~ .login-yeni-sifre-alani,
+.login-sifre-toggle-satiri:has(.login-sifre-toggle:checked) ~ .login-sifre-degistir-butonu {
+    display: block;
+}
+
+.login-sifre-toggle-satiri:has(.login-sifre-toggle:checked) ~ .login-varsayilan-alan,
+.login-sifre-toggle-satiri:has(.login-sifre-toggle:checked) ~ .login-giris-butonu {
+    display: none;
+}

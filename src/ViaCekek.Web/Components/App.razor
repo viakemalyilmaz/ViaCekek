@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿@inject IWebHostEnvironment Env
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -7,7 +8,7 @@
     <base href="/" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="app.css?v=@DosyaVersiyonu("app.css")" />
     <link rel="stylesheet" href="ViaCekek.Web.styles.css" />
     <HeadOutlet />
 </head>
@@ -15,7 +16,25 @@
 <body>
     <Routes />
     <script src="_framework/blazor.web.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=@DosyaVersiyonu("app.js")"></script>
 </body>
 
 </html>
+
+@code {
+    // app.css/app.js sabit isimle servis edildiği için tarayıcılar
+    // agresif önbelleğe alıyor — yayına her çıkışta dosya değişmiş
+    // olsa bile eski sürüm gösterilmeye devam edebiliyor (2026-09-22'de
+    // gerçek sahada birkaç kez CSS/JS değişikliği görünmeyip "hard
+    // refresh" ile düzelen bir kafa karışıklığına yol açtı). Dosyanın
+    // son değişiklik zamanını ?v= olarak eklemek, her deploy'da dosya
+    // değişince URL'i otomatik değiştirip önbelleği kırıyor — manuel
+    // versiyon numarası tutmaya gerek kalmıyor.
+    private string DosyaVersiyonu(string dosyaAdi)
+    {
+        var yol = Path.Combine(Env.WebRootPath, dosyaAdi);
+        return File.Exists(yol)
+            ? File.GetLastWriteTimeUtc(yol).Ticks.ToString()
+            : "0";
+    }
+}

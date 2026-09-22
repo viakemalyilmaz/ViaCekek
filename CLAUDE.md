@@ -180,6 +180,49 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Takip Raporu: Tekne filtresi aranabilir yapıldı, Giriş/Çıkış Tarihi
+  yan yana getirildi (2026-09-22)**: Tekne filtresi, tüm tekneleri (6.683
+  satır) tek `<select>`e döken eski hâlinden `/cekektakip`'teki Tekne
+  arama alanıyla birebir aynı deseninde arama-kutusu + tıklanabilir sonuç
+  listesine çevrildi — `tekneler` zaten `OnInitializedAsync`'te belleğe
+  yüklü olduğu için yeni bir DB sorgusu gerekmedi, filtreleme bellek
+  içinde yapılıyor (`TekneAramaDegisti`/`TekneSec`/`TekneSecimiTemizle`,
+  `tekneIdFiltre` her yazışta null'a çekilip yalnızca listeden tıklanarak
+  seçilince set ediliyor — aynı "ekrandaki metinle seçili Id
+  uyuşmazlığı" önlemi). **Giriş/Çıkış Tarihi + Kaydeden düzeni** iki
+  aşamada değişti: önce Giriş Tarihi (col-md-6) + Çıkış Tarihi (col-md-6)
+  yan yana, Kaydeden ayrı satırda denendi — ama kullanıcı dar ekranda
+  bunun kaydığını fark etti, kesin kök sebep DevTools ile ayrıca
+  doğrulanmadı (muhtemelen col-md-6 çiftinin sayfadaki tek yeri olması,
+  diğer tüm satırlar col-md-4×3 deseninde). **Son hâli**: kullanıcının
+  önerisiyle Giriş Tarihi (col-md-8) + Kaydeden (col-md-4) aynı satırda
+  (8+4=12, diğer satırlarla aynı toplam), Çıkış Tarihi (col-md-8) kendi
+  satırında tek başına — böylece sayfadaki HER satır aynı 4/8/12
+  kolon deseniyle tutarlı, özel bir col-md-6 çifti kalmadı.
+
+- **Kalıcı çözüm (2026-09-22): `app.css`/`app.js` için otomatik
+  cache-busting eklendi.** Aynı gün içinde art arda birkaç kez (Login
+  checkbox CSS'i, sonra Takip Raporu'ndaki tarih filtresi düzeni)
+  kullanıcı yayına aldıktan sonra değişikliği göremedi, hard-refresh
+  sonrası düzeldi — kök sebep `app.css`/`app.js`'in sabit isimle servis
+  edilmesi, tarayıcının eski sürümü önbellekte tutmaya devam etmesiydi.
+  **Çözüm**: `App.razor`'a `IWebHostEnvironment` inject edilip
+  `DosyaVersiyonu(dosyaAdi)` adında bir yardımcı eklendi —
+  `wwwroot`'taki dosyanın `File.GetLastWriteTimeUtc(...).Ticks` değerini
+  döndürüyor; `<link href="app.css?v=@DosyaVersiyonu(\"app.css\")">` ve
+  `<script src="app.js?v=@DosyaVersiyonu(\"app.js\")">` şeklinde
+  kullanılıyor. Dosya her değiştiğinde (her yayına almada) URL otomatik
+  değişip tarayıcı önbelleğini kırıyor — manuel versiyon numarası tutmak
+  gerekmiyor. Gerçek `dotnet run` ile doğrulandı: sayfa HTML'inde
+  `app.css?v=<uzun-sayı>` göründüğü, o sorgu string'iyle isteğin hâlâ
+  200 döndüğü ve gerçek (güncel) dosya içeriğini verdiği teyit edildi
+  (ASP.NET Core statik dosya middleware'i query string'i yok sayıp
+  dosyayı normal servis ediyor). **Ders**: statik dosyaları sabit
+  isimle servis etmek, her deploy sonrası "değişiklik görünmüyor" gibi
+  yanlış bug raporlarına yol açabiliyor — bundan sonra yeni bir statik
+  varlık (CSS/JS) eklenirse aynı `DosyaVersiyonu()` deseniyle
+  versiyonlanmalı.
+
 - **Kullanıcının kendi şifresini değiştirmesi eklendi (2026-09-22) — ilk
   deneme geri alındı, Login sayfasına entegre edildi**: İlk denemede
   Identity scaffold'undan gelen hazır `/Account/Manage/ChangePassword`
@@ -237,6 +280,40 @@ sıradaki adım olarak güncellenmeli.
   `MainLayout`/`LoginDisplay` ile aynı anda DB'ye gitme riski var;
   bundan sonra böyle bir ihtiyaç çıkarsa ya anonim bir sayfaya
   (Login gibi) taşınmalı ya da bu riski bilerek göze alınmalı.
+
+- **Düzeltildi (2026-09-22, aynı gün): Login'de "Şifremi değiştirmek
+  istiyorum" checkbox'ı işaretlenip hemen ardından butona basılınca
+  "Yeni şifre zorunlu" hatası çıkıyordu.** Kök sebep: sayfa statik
+  (interaktif olmayan) render edildiği için `@if (Input.
+  SifreDegistirModu) { ...Yeni Şifre alanı... }` deseni, checkbox'ın
+  tarayıcıdaki değişimine ancak bir sonraki sunucu round-trip'inde
+  (yani formun gönderilmesinden SONRA) tepki verebiliyordu — kullanıcı
+  checkbox'ı işaretleyip (henüz DOM'da bile olmayan) "Yeni Şifre"
+  alanına yazma fırsatı bulamadan, o anda hâlâ görünen "Giriş Yap"
+  butonuna bastığında form `SifreDegistirModu=true` + boş `YeniSifre`
+  ile gönderiliyor, sunucu bunu geçerli bir şifre değiştirme denemesi
+  sayıp erken hata veriyordu. **Çözüm**: alan/buton görünürlüğü artık
+  `@if` yerine saf CSS ile yönetiliyor (`wwwroot/app.css`) — checkbox +
+  hedef bloklar (Yeni Şifre alanı, "Beni hatırla"/"şifremi unuttum"
+  metni, iki farklı buton) DOM'da her zaman var, tarayıcı JS/sunucu
+  round-trip'i olmadan anında gösterilip gizleniyor. **İki katman**:
+  önce navbar hamburger menüsündeki gibi düz `:checked ~` denendi ama
+  checkbox kendi Bootstrap `.form-check` div'inin içinde olduğu için
+  (label ile hizalanabilsin diye) düz kardeş seçici checkbox'ın dışına
+  çıkamadı; bunun yerine checkbox'ı saran satıra `login-sifre-toggle-
+  satiri` sınıfı verilip `:has()` ile o satırın içindeki checkbox'ın
+  durumu okunuyor (`.login-sifre-toggle-satiri:has(.login-sifre-toggle:
+  checked) ~ .hedef-sinif`) — proje yalnızca modern Chromium hedeflediği
+  için (`CLAUDE.md > Varsayımlar`) `:has()` kullanımı güvenli. Gerçek
+  `dotnet run` ile render edilen HTML çıktısı okunarak DOM sıralamasının
+  (checkbox satırı → Yeni Şifre alanı → Beni hatırla → iki buton →
+  unuttum metni, hepsi formun düz kardeşleri) doğru olduğu doğrulandı.
+  **Ders**: statik render edilen bir sayfada kullanıcı etkileşimine
+  (checkbox/radio/select gibi) bağlı UI görünürlüğü asla `@if` ile
+  yapılmamalı — interaktif olmayan sayfalarda bu yalnızca BİR SONRAKİ
+  form gönderiminde yansır, ilk etkileşimde yanıltıcı/hatalı davranışa
+  yol açar; bunun yerine navbar'da zaten kullanılan checkbox+CSS
+  deseni (gerekirse `:has()` ile) tercih edilmeli.
 
 - **Kullanıcılar ekranına Sil özelliği eklendi (2026-09-22)**:
   `/kullanicilar`'da her satıra (kendi hesap hariç) bir "Sil" butonu
