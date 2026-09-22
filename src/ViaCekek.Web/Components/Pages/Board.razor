@@ -134,6 +134,23 @@ else
         foreach (var kayit in suresiGecenler)
         {
             kayit.Durum = CekekTakipDurumu.ZamanAsimi;
+
+            // Keşif/Kontrol'ün 1 saatlik süresi dolunca (yalnızca kişi
+            // girişlerinde — bu ikisi kişi tarafında tek 1 saatlik
+            // kategori, bkz. SureLimiti) ziyaret sebebi otomatik olarak
+            // Çalışma'ya çevrilir, eski sebep açıklamaya not düşülür.
+            // Durum kasıtlı olarak ZamanAsimi (Süresi Geçti) kalır —
+            // kullanıcı isteğiyle GirisYapildi'ya sıfırlanmıyor.
+            if (kayit.KisiId is not null &&
+                (kayit.ZiyaretSebebi == ZiyaretSebebi.Kesif || kayit.ZiyaretSebebi == ZiyaretSebebi.Kontrol))
+            {
+                var eskiSebepAdi = ZiyaretSebebiAdi(kayit.ZiyaretSebebi);
+                var not = $"{eskiSebepAdi} sebebi Çalışma olmuştur.";
+                kayit.Aciklama = string.IsNullOrWhiteSpace(kayit.Aciklama)
+                    ? not
+                    : $"{kayit.Aciklama}\n{not}";
+                kayit.ZiyaretSebebi = ZiyaretSebebi.Calisma;
+            }
         }
         if (suresiGecenler.Count > 0)
         {

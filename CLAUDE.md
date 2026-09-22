@@ -930,6 +930,21 @@ varsayımları kullanıcıyla konuşulup yukarıdaki akışa değiştirildi.
   Keşif/Kontrol = **1 saat**, Malzeme Alma/Malzeme Bırakma = **15
   dakika**. Süresi dolan kayıtlar board'da öncelik artırılarak en üste
   çıkar; kullanıcı board üzerinden "+15 dk" uzatma verebilir.
+- **Keşif/Kontrol süresi dolunca otomatik Çalışma'ya çevrilir
+  (2026-09-22)**: `Board.razor` > `ListeyiYenile()`'deki süresi geçen
+  kayıtları `ZamanAsimi`'ye çeviren döngüde, yalnızca **kişi**
+  girişlerinde (`KisiId` dolu — araç girişleri hariç, onlar zaten
+  Ziyaret Sebebi'nden bağımsız kendi kuralını kullanıyor) Ziyaret
+  Sebebi Keşif veya Kontrol ise: `Aciklama`'ya `"Keşif sebebi Çalışma
+  olmuştur."` (veya "Kontrol sebebi...") notu eklenir (mevcut açıklama
+  varsa üzerine yazılmaz, alt satıra eklenir) ve `ZiyaretSebebi`
+  `Calisma`'ya güncellenir. **`Durum` bilerek `ZamanAsimi` (Süresi
+  Geçti) olarak kalır** — kullanıcı isteğiyle `GirisYapildi`'ya veya
+  `BeklenenBitisZamani` `null`'a sıfırlanmıyor (Çalışma süresiz bir
+  kategori olsa da, board'da kırmızı/"Süresi Geçti" görünümü korunuyor).
+  Gerçek DB'ye karşı scratch script'le doğrulandı: hem boş hem dolu
+  açıklamalı kayıtlarda not doğru ekleniyor, `ZiyaretSebebi` doğru
+  güncelleniyor, `Durum` `ZamanAsimi` kalıyor.
 - **Araç girişleri için süre kuralı Ziyaret Sebebi'nden tamamen
   bağımsız hale getirildi (2026-08-24)**: Kişi girişleri hâlâ yukarıdaki
   Ziyaret Sebebi kuralını kullanır (`SureLimiti()`, değişmedi — "kişilerde
