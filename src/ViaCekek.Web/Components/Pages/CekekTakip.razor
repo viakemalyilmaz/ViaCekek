@@ -8,6 +8,8 @@
 @using ViaCekek.Web.Models.Common
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthProvider
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Çekek Takip</PageTitle>
 
@@ -24,9 +26,17 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Kimlik Numarası (Kişi)</label>
-                <input class="form-control form-control-lg"
-                       @bind:get="kimlikNumarasi" @bind:set="KimlikNumarasiDegisti" @bind:event="oninput"
-                       autocomplete="off" autofocus />
+                <div class="input-group">
+                    <input class="form-control form-control-lg"
+                           @bind:get="kimlikNumarasi" @bind:set="KimlikNumarasiDegisti" @bind:event="oninput"
+                           autocomplete="off" autofocus />
+                    <button type="button" class="btn btn-outline-secondary btn-lg" @onclick="KameraAc" title="Kamerayla Okut">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                    </button>
+                </div>
                 @if (eslesenKisiler.Count > 0)
                 {
                     <div class="list-group mt-1">
@@ -258,6 +268,24 @@ else if (asama == Asama.Onay)
     </div>
 }
 
+@if (kameraAcik)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center"
+         style="background-color: rgba(0,0,0,0.85); z-index: 1050;">
+        <div class="bg-white rounded p-3" style="max-width: 500px; width: 90%;">
+            <h5 class="mb-3">Barkodu Kameraya Gösterin</h5>
+            @if (kameraHataMesaji is not null)
+            {
+                <div class="alert alert-danger">@kameraHataMesaji</div>
+            }
+            <div id="barkod-video-alani" style="width: 100%;"></div>
+            <button type="button" class="btn btn-secondary btn-lg w-100 mt-3" @onclick="KameraKapat">Kapat</button>
+        </div>
+    </div>
+}
+
+<script src="lib/html5-qrcode.min.js"></script>
+
 @code {
     private enum Asama { Sorgu, Onay }
 
@@ -303,6 +331,11 @@ else if (asama == Asama.Onay)
     private string? basariMesaji;
     private string? hataMesaji;
 
+    private bool kameraAcik;
+    private bool kameraTaramaBaslatildi;
+    private string? kameraHataMesaji;
+    private DotNetObjectReference<CekekTakip>? kameraDotNetRef;
+
     private async Task<string?> AktifKullaniciAdi()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
@@ -313,6 +346,77 @@ else if (asama == Asama.Onay)
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         tekneler = await db.Tekneler.AsNoTracking().Where(t => t.Aktif).OrderBy(t => t.TekneKodu).ToListAsync();
+    }
+
+    // Kamera modal'ı @if ile açılınca DOM'a yeni giren "barkod-video-alani"
+    // div'i ancak render sonrası hazır olur — bu yüzden tarama JS
+    // interop'u burada, bayrak (kameraTaramaBaslatildi) ile tek seferlik
+    // olarak tetiklenir.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (kameraAcik && !kameraTaramaBaslatildi)
+        {
+            kameraTaramaBaslatildi = true;
+            kameraDotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("barkodTaramayiBaslat", kameraDotNetRef, "barkod-video-alani");
+        }
+    }
+
+    private void KameraAc()
+    {
+        kameraHataMesaji = null;
+        kameraTaramaBaslatildi = false;
+        kameraAcik = true;
+    }
+
+    private async Task KameraKapat()
+    {
+        kameraAcik = false;
+        kameraTaramaBaslatildi = false;
+        kameraHataMesaji = null;
+        try
+        {
+            await JS.InvokeVoidAsync("barkodTaramayiDurdur");
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit zaten kapanmış olabilir (sayfadan ayrılma vb.), yoksay.
+        }
+    }
+
+    [JSInvokable]
+    public async Task BarkodOkundu(string sonuc)
+    {
+        await KameraKapat();
+        await KimlikNumarasiDegisti(sonuc);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void BarkodHata(string mesaj)
+    {
+        kameraHataMesaji = mesaj;
+        kameraTaramaBaslatildi = false;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        kimlikAramaCts?.Cancel();
+        takipAramaCts?.Cancel();
+
+        if (kameraDotNetRef is not null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("barkodTaramayiDurdur");
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit zaten kapanmış olabilir, yoksay.
+            }
+            kameraDotNetRef.Dispose();
+        }
     }
 
     private static string ZiyaretSebebiAdi(ZiyaretSebebi sebep) => sebep switch

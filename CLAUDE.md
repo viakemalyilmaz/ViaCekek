@@ -180,6 +180,27 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Çekek Takip'te Kimlik No alanına kamerayla barkod okuma eklendi
+  (2026-09-22)**: `/cekektakip` Kimlik Numarası (Kişi) alanının yanına
+  kamera ikonlu bir buton eklendi — basılınca tam ekran bir modal açılıp
+  tabletin arka kamerasıyla barkod okutulabiliyor, okunan metin doğrudan
+  mevcut `KimlikNumarasiDegisti` debounce/arama akışına yazılıyor (elle
+  yazım veya mevcut USB/Bluetooth el tipi okuyucu — klavye emülasyonu —
+  ile aynı yoldan geçiyor, o mekanizma değişmedi, kamera buna ek bir
+  alternatif). Barkod decode için `html5-qrcode` (v2.3.8, MIT) kütüphanesi
+  `wwwroot/lib/html5-qrcode.min.js` altına elle vendored edildi (projede
+  npm/libman yok, Bootstrap CSS'in eklendiği yöntemle aynı — CDN'e
+  bağımlı değil, offline/tablet güvenilirliği ilkesiyle tutarlı).
+  **Önkoşul**: kamera erişimi (`getUserMedia`) tarayıcı güvenlik kuralı
+  gereği yalnızca HTTPS veya localhost üzerinde çalışır; kod tarafında
+  HTTPS zorlaması yoktu (`Program.cs`'de `UseHttpsRedirection` çağrısı
+  yok, tamamen IIS binding'ine bağlı) — bu özellik için kullanıcı IIS'e
+  HTTPS binding/sertifika kurdu (2026-09-22). Kamera açılamazsa (izin
+  reddi, HTTPS eksikliği, cihazda kamera yoksa) modal içinde kırmızı bir
+  hata mesajı gösteriliyor, uygulama çökmüyor. İkon: emoji yerine sade
+  çizgisel (outline) bir kamera SVG'si kullanıldı, Board'daki ikon
+  yaklaşımıyla tutarlı (harici ikon kütüphanesi yok).
+
 - **Kisi/Arac senkronizasyonu kaldırıldı, Telefon zorunlu oldu, Board'da
   telefon gösteriliyor (2026-08-26)**: Kullanıcı sahada şunu fark etti —
   Çekek Takip Onay ekranında Telefon alanı yanlışlıkla boşaltılıp
