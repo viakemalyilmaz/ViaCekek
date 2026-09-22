@@ -1,5 +1,5 @@
 @page "/"
-@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik}")]
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.Guvenlik},{Roller.OnBuro}")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
@@ -66,13 +66,16 @@ else
                             <span class="badge fs-6 @SureRozetSinifi(kayit)">@SureMetni(kayit)</span>
                         </div>
                     </div>
-                    <div class="d-flex gap-2">
-                        @if (kayit.Durum == CekekTakipDurumu.ZamanAsimi)
-                        {
-                            <button class="btn btn-lg btn-warning" @onclick="() => SureUzat(kayit.Id)">+15 dk</button>
-                        }
-                        <button class="btn btn-lg btn-danger" @onclick="() => CikisYap(kayit.Id)">Çıkış</button>
-                    </div>
+                    @if (!sadeceIzleme)
+                    {
+                        <div class="d-flex gap-2">
+                            @if (kayit.Durum == CekekTakipDurumu.ZamanAsimi)
+                            {
+                                <button class="btn btn-lg btn-warning" @onclick="() => SureUzat(kayit.Id)">+15 dk</button>
+                            }
+                            <button class="btn btn-lg btn-danger" @onclick="() => CikisYap(kayit.Id)">Çıkış</button>
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -82,6 +85,7 @@ else
 @code {
     private List<CekekTakipKaydi>? kayitlar;
     private string aramaMetni = string.Empty;
+    private bool sadeceIzleme;
 
     private IEnumerable<CekekTakipKaydi> GorunenKayitlar
     {
@@ -105,6 +109,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        sadeceIzleme = authState.User.IsInRole(Roller.OnBuro);
         await ListeyiYenile();
     }
 
@@ -251,6 +257,11 @@ else
 
     private async Task CikisYap(int id)
     {
+        if (sadeceIzleme)
+        {
+            return;
+        }
+
         await using var db = await DbFactory.CreateDbContextAsync();
         var kayit = await db.CekekTakipleri.FindAsync(id);
         if (kayit is null)
@@ -270,6 +281,11 @@ else
 
     private async Task SureUzat(int id)
     {
+        if (sadeceIzleme)
+        {
+            return;
+        }
+
         await using var db = await DbFactory.CreateDbContextAsync();
         var kayit = await db.CekekTakipleri.FindAsync(id);
         if (kayit is null || kayit.BeklenenBitisZamani is null)

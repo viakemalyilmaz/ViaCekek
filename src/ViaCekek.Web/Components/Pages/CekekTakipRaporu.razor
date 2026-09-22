@@ -1,5 +1,5 @@
 @page "/rapor"
-@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.OnBuro}")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
@@ -120,6 +120,18 @@
             </div>
         </div>
 
+        <div class="col-md-4">
+            <label class="form-label">Kaydeden</label>
+            <div class="input-group">
+                <select class="form-select" style="max-width: 140px;" @bind="kaydedenFiltre.Operator">
+                    <option value="@MetinOperatoru.Icerir">İçerir</option>
+                    <option value="@MetinOperatoru.Esittir">Eşittir</option>
+                    <option value="@MetinOperatoru.BaslarIle">Başlar ile</option>
+                </select>
+                <input class="form-control" @bind="kaydedenFiltre.Deger" />
+            </div>
+        </div>
+
         <div class="col-md-6">
             <label class="form-label">Giriş Tarihi</label>
             <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -190,6 +202,7 @@ else
                     <th>Çıkış</th>
                     <th>Durum</th>
                     <th>Açıklama</th>
+                    <th>Kaydeden</th>
                 </tr>
             </thead>
             <tbody>
@@ -207,6 +220,7 @@ else
                         <td>@CikisMetni(kayit)</td>
                         <td>@DurumAdi(kayit.Durum)</td>
                         <td>@kayit.Aciklama</td>
+                        <td>@kayit.Kaydeden</td>
                     </tr>
                 }
             </tbody>
@@ -247,6 +261,7 @@ else
     private MetinFiltre firmaFiltre = new();
     private MetinFiltre telefonFiltre = new();
     private MetinFiltre aciklamaFiltre = new();
+    private MetinFiltre kaydedenFiltre = new();
     private TarihFiltre girisTarihiFiltre = new() { Operator = TarihOperatoru.Esittir, Tarih1 = DateOnly.FromDateTime(DateTime.Now) };
     private TarihFiltre cikisTarihiFiltre = new();
     private AracTuru? aracTuruFiltre;
@@ -368,6 +383,17 @@ else
             };
         }
 
+        if (!string.IsNullOrWhiteSpace(kaydedenFiltre.Deger))
+        {
+            var deger = kaydedenFiltre.Deger.Trim();
+            sorgu = kaydedenFiltre.Operator switch
+            {
+                MetinOperatoru.Esittir => sorgu.Where(c => c.Kaydeden == deger),
+                MetinOperatoru.BaslarIle => sorgu.Where(c => c.Kaydeden != null && c.Kaydeden.StartsWith(deger)),
+                _ => sorgu.Where(c => c.Kaydeden != null && c.Kaydeden.Contains(deger))
+            };
+        }
+
         if (aracTuruFiltre is not null)
         {
             sorgu = sorgu.Where(c => c.Arac != null && c.Arac.AracTuru == aracTuruFiltre);
@@ -427,6 +453,7 @@ else
         firmaFiltre = new();
         telefonFiltre = new();
         aciklamaFiltre = new();
+        kaydedenFiltre = new();
         girisTarihiFiltre = new();
         cikisTarihiFiltre = new();
         aracTuruFiltre = null;
@@ -449,7 +476,7 @@ else
         string[] basliklar =
         [
             "Kimlik/Takip No", "Ad Soyad", "Firma Adı", "Telefon", "Araç Türü",
-            "Tekne", "Ziyaret Sebebi", "Giriş", "Çıkış", "Durum", "Açıklama"
+            "Tekne", "Ziyaret Sebebi", "Giriş", "Çıkış", "Durum", "Açıklama", "Kaydeden"
         ];
         for (var i = 0; i < basliklar.Length; i++)
         {
@@ -471,6 +498,7 @@ else
             sayfa.Cell(satir, 9).Value = CikisMetni(kayit);
             sayfa.Cell(satir, 10).Value = DurumAdi(kayit.Durum);
             sayfa.Cell(satir, 11).Value = kayit.Aciklama ?? string.Empty;
+            sayfa.Cell(satir, 12).Value = kayit.Kaydeden ?? string.Empty;
             satir++;
         }
 

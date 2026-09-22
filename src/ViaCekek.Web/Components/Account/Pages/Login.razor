@@ -6,6 +6,7 @@
 @using ViaCekek.Web.Data
 
 @inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
 @inject ILogger<Login> Logger
 @inject IdentityRedirectManager RedirectManager
 
@@ -16,7 +17,7 @@
     <div class="col-md-4">
         <section>
             <StatusMessage Message="@errorMessage" />
-            <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+            <EditForm Model="Input" method="post" OnValidSubmit="FormuGonder" FormName="login">
                 <DataAnnotationsValidator />
                 <h2>Yerel hesapla giriş yapın</h2>
                 <hr />
@@ -28,21 +29,42 @@
                 </div>
                 <div class="form-floating mb-3">
                     <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="şifre" />
-                    <label for="password" class="form-label">Şifre</label>
+                    <label for="password" class="form-label">@(Input.SifreDegistirModu ? "Mevcut Şifre" : "Şifre")</label>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
-                <div class="checkbox mb-3">
-                    <label class="form-label">
-                        <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
-                        Beni hatırla
-                    </label>
+
+                <div class="form-check mb-3">
+                    <InputCheckbox @bind-Value="Input.SifreDegistirModu" class="form-check-input" id="sifreDegistirModu" />
+                    <label class="form-check-label" for="sifreDegistirModu">Şifremi değiştirmek istiyorum</label>
                 </div>
+
+                @if (Input.SifreDegistirModu)
+                {
+                    <div class="form-floating mb-3">
+                        <InputText type="password" @bind-Value="Input.YeniSifre" class="form-control" autocomplete="new-password" aria-required="true" placeholder="yeni şifre" />
+                        <label for="yeniSifre" class="form-label">Yeni Şifre</label>
+                    </div>
+                }
+                else
+                {
+                    <div class="checkbox mb-3">
+                        <label class="form-label">
+                            <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
+                            Beni hatırla
+                        </label>
+                    </div>
+                }
+
                 <div>
-                    <button type="submit" class="w-100 btn btn-lg btn-primary">Giriş Yap</button>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">@(Input.SifreDegistirModu ? "Şifre Değiştir" : "Giriş Yap")</button>
                 </div>
-                <p class="text-muted mt-3">
-                    Şifrenizi unuttuysanız yöneticinizle iletişime geçin.
-                </p>
+
+                @if (!Input.SifreDegistirModu)
+                {
+                    <p class="text-muted mt-3">
+                        Şifrenizi unuttuysanız yöneticinizle iletişime geçin.
+                    </p>
+                }
             </EditForm>
         </section>
     </div>
@@ -66,6 +88,18 @@
         {
             // Clear the existing external cookie to ensure a clean login process
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+    }
+
+    private async Task FormuGonder()
+    {
+        if (Input.SifreDegistirModu)
+        {
+            await SifreDegistirVeGirisYap();
+        }
+        else
+        {
+            await LoginUser();
         }
     }
 
@@ -96,6 +130,47 @@
         }
     }
 
+    // Kullanıcının kendi şifresini, girişten önce, mevcut şifresini
+    // doğrulayarak değiştirmesi için — bkz. CLAUDE.md: bu bilerek
+    // authenticated Manage/ChangePassword sayfası yerine Login'e
+    // eklendi (o sayfa LoginDisplay ile aynı Scoped DbContext'i
+    // paylaştığı için "A second operation was started..." hatası
+    // veriyordu; anonim Login sayfasında bu çakışma hiç oluşmuyor).
+    private async Task SifreDegistirVeGirisYap()
+    {
+        if (string.IsNullOrWhiteSpace(Input.YeniSifre))
+        {
+            errorMessage = "Hata: Yeni şifre zorunlu.";
+            return;
+        }
+
+        var kullanici = await UserManager.FindByNameAsync(Input.KullaniciAdi);
+        if (kullanici is null)
+        {
+            errorMessage = "Hata: Kullanıcı adı veya şifre hatalı.";
+            return;
+        }
+
+        var sonuc = await UserManager.ChangePasswordAsync(kullanici, Input.Password, Input.YeniSifre);
+        if (!sonuc.Succeeded)
+        {
+            errorMessage = "Hata: " + string.Join(" ", sonuc.Errors.Select(e => e.Description));
+            return;
+        }
+
+        Logger.LogInformation("User changed their own password.");
+
+        var girisSonucu = await SignInManager.PasswordSignInAsync(Input.KullaniciAdi, Input.YeniSifre, Input.RememberMe, lockoutOnFailure: false);
+        if (girisSonucu.Succeeded)
+        {
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else
+        {
+            RedirectManager.RedirectToWithStatus("Account/Login", "Şifreniz değiştirildi. Lütfen yeni şifrenizle giriş yapın.", HttpContext);
+        }
+    }
+
     private sealed class InputModel
     {
         [Required]
@@ -107,5 +182,10 @@
 
         [Display(Name = "Beni hatırla")]
         public bool RememberMe { get; set; }
+
+        public bool SifreDegistirModu { get; set; }
+
+        [DataType(DataType.Password)]
+        public string? YeniSifre { get; set; }
     }
 }

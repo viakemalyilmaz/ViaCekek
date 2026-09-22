@@ -7,6 +7,7 @@
 @using ViaCekek.Web.Data
 @inject UserManager<ApplicationUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Kullanıcılar</PageTitle>
 
@@ -104,6 +105,10 @@ else
                     <td>
                         <button class="btn btn-outline-primary" @onclick="() => DuzenlemeBaslat(kullanici, rol, aktif)">Düzenle</button>
                         <button class="btn btn-outline-secondary" @onclick="() => SifreSifirlamaBaslat(kullanici)">Şifre Sıfırla</button>
+                        @if (kullanici.Id != mevcutKullaniciId)
+                        {
+                            <button class="btn btn-outline-danger" @onclick="() => SilmeBaslat(kullanici)">Sil</button>
+                        }
                     </td>
                 </tr>
                 @if (sifreSifirlananKullaniciId == kullanici.Id)
@@ -129,6 +134,24 @@ else
                         </td>
                     </tr>
                 }
+                @if (silinecekKullaniciId == kullanici.Id)
+                {
+                    <tr>
+                        <td colspan="5">
+                            <div class="card card-body border-danger">
+                                @if (silmeHataMesaji is not null)
+                                {
+                                    <div class="alert alert-danger">@silmeHataMesaji</div>
+                                }
+                                <p class="mb-2"><strong>@kullanici.UserName</strong> kullanıcısını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</p>
+                                <div>
+                                    <button class="btn btn-danger" @onclick="() => Sil(kullanici)">Evet, Sil</button>
+                                    <button class="btn btn-secondary" @onclick="SilmeIptal">Vazgeç</button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
             }
         </tbody>
     </table>
@@ -146,8 +169,14 @@ else
     private SifreSifirlamaModeli sifreSifirlama = new();
     private string? sifreHataMesaji;
 
+    private string? silinecekKullaniciId;
+    private string? silmeHataMesaji;
+    private string? mevcutKullaniciId;
+
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        mevcutKullaniciId = UserManager.GetUserId(authState.User);
         await ListeyiYenile();
     }
 
@@ -257,6 +286,7 @@ else
         sifreSifirlananKullaniciId = kullanici.Id;
         sifreSifirlama = new SifreSifirlamaModeli();
         sifreHataMesaji = null;
+        silinecekKullaniciId = null;
     }
 
     private void SifreSifirlamaIptal()
@@ -285,6 +315,51 @@ else
         }
 
         sifreSifirlananKullaniciId = null;
+    }
+
+    private void SilmeBaslat(ApplicationUser kullanici)
+    {
+        silinecekKullaniciId = kullanici.Id;
+        silmeHataMesaji = null;
+        sifreSifirlananKullaniciId = null;
+    }
+
+    private void SilmeIptal()
+    {
+        silinecekKullaniciId = null;
+        silmeHataMesaji = null;
+    }
+
+    private async Task Sil(ApplicationUser kullanici)
+    {
+        silmeHataMesaji = null;
+
+        if (kullanici.Id == mevcutKullaniciId)
+        {
+            silmeHataMesaji = "Kendi hesabınızı silemezsiniz.";
+            return;
+        }
+
+        var roller = await UserManager.GetRolesAsync(kullanici);
+        if (roller.Contains(Roller.Yonetici))
+        {
+            var yoneticiler = await UserManager.GetUsersInRoleAsync(Roller.Yonetici);
+            if (yoneticiler.Count(y => y.Id != kullanici.Id) == 0)
+            {
+                silmeHataMesaji = "Son Yönetici hesabı silinemez.";
+                return;
+            }
+        }
+
+        var sonuc = await UserManager.DeleteAsync(kullanici);
+        if (!sonuc.Succeeded)
+        {
+            silmeHataMesaji = string.Join(" ", sonuc.Errors.Select(e => e.Description));
+            return;
+        }
+
+        silinecekKullaniciId = null;
+        await ListeyiYenile();
     }
 
     private sealed class KullaniciFormu

@@ -180,6 +180,91 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Kullanıcının kendi şifresini değiştirmesi eklendi (2026-09-22) — ilk
+  deneme geri alındı, Login sayfasına entegre edildi**: İlk denemede
+  Identity scaffold'undan gelen hazır `/Account/Manage/ChangePassword`
+  sayfasına `LoginDisplay.razor`'dan bir link verildi. Kullanıcı gerçek
+  tarayıcıda denedi ve iki sorun çıktı: (1) **çöktü** —
+  `InvalidOperationException: A second operation was started on this
+  context instance before a previous operation completed`; kök sebep
+  önceki concurrent-DbContext hatalarından farklı bir varyanttı — bu
+  sayfa (statik render, `IDbContextFactory` kullanmıyor, doğrudan
+  `UserManager` üzerinden Identity'nin **paylaşılan Scoped**
+  `ApplicationDbContext`'ini kullanıyor) `MainLayout`'taki
+  `LoginDisplay`'in **aynı** Scoped DbContext'i kullanan kendi
+  `UserManager.GetUserAsync` çağrısıyla aynı static render geçişinde
+  çakışıyordu — Blazor, layout ile sayfanın `OnInitializedAsync`'lerini
+  birbirini beklemeden paralel başlatabiliyor, ikisi de authenticated bir
+  kullanıcı için DB'ye gidince çakışma oluşuyordu (Login sayfası
+  anonim ziyaretçilerde çakışmıyordu çünkü `LoginDisplay`'in çağrısı
+  `GetUserId(anonim principal)` null döndüğü için DB'ye hiç gitmeden
+  kısa devre yapıyor — bu yüzden mevcut Login/Register akışları hiç
+  bu hatayı vermemişti). (2) Kullanıcı ayrıca **tasarımı da istemedi**:
+  sayfa Identity'nin genel "Manage your account" iskeletini (Profile/
+  Email/2FA/Personal data yan menüsü — `ManageNavMenu.razor`) da
+  getiriyordu, oysa istenen tek şey basit bir şifre değiştirme. **Kalıcı
+  çözüm**: `LoginDisplay.razor`'daki link kaldırıldı; bunun yerine
+  `/Account/Login` sayfasına kullanıcının önerisiyle bir "Şifremi
+  değiştirmek istiyorum" checkbox'ı eklendi — işaretlenince "Yeni Şifre"
+  alanı görünür, "Beni hatırla" ve "şifremi unuttum" metni gizlenir,
+  buton "Giriş Yap"tan "Şifre Değiştir"e döner. Gönderilince
+  `UserManager.FindByNameAsync` + `ChangePasswordAsync(kullanici,
+  mevcutSifre, yeniSifre)` (mevcut şifre doğrulaması bunun içinde zaten
+  yapılıyor, ayrı bir kontrol adımı gerekmedi) başarılıysa yeni şifreyle
+  otomatik `SignInManager.PasswordSignInAsync` yapılıp ana sayfaya
+  yönlendiriliyor — kullanıcı iki ayrı adım (önce şifre değiştir, sonra
+  tekrar giriş yap) yaşamıyor. Bu akış anonim Login sayfasında çalıştığı
+  için yukarıdaki concurrent-DbContext hatasını yapısal olarak
+  tetiklemiyor. Kullanılmayan ve artık hiçbir yerden erişilemeyen tüm
+  `Components/Account/Pages/Manage/` klasörü (ChangePassword, SetPassword,
+  Email, 2FA, ExternalLogins, PersonalData, vb. — hiçbiri hiç
+  kullanılmamıştı) + `ManageLayout.razor`/`ManageNavMenu.razor` silindi
+  (2026-08-11'de ForgotPassword/ResetPassword/ResendEmailConfirmation'ın
+  silinmesiyle aynı gerekçe: kullanılmayan + riskli Identity sayfalarını
+  yarım bırakmak yerine tamamen kaldırmak); `IdentityComponentsEndpoint
+  RouteBuilderExtensions.cs`'teki yalnızca bu silinen sayfalara hizmet
+  eden `/Account/Manage/LinkExternalLogin` ve `/Account/Manage/
+  DownloadPersonalData` endpoint'leri de birlikte kaldırıldı. Gerçek
+  DB'ye karşı doğrulandı: yanlış mevcut şifreyle deneme reddediliyor
+  (`ChangePasswordAsync` kendi "Incorrect password" hatasını dönüyor),
+  doğru mevcut şifreyle değişiklik başarılı oluyor, değişiklik sonrası
+  eski şifre geçersiz/yeni şifre geçerli, var olmayan kullanıcı adı
+  düzgün ele alınıyor. **Ders**: statik render edilen Identity/Account
+  sayfaları (rendermode almadıkları için) `IDbContextFactory` deseninin
+  dışında kalıyor ve Identity'nin paylaşılan Scoped `ApplicationDbContext`
+  ini `UserManager` üzerinden kullanmaya devam ediyor — bu yüzden
+  authenticated bir Account sayfası eklenirse (Login/Register'ın aksine)
+  `MainLayout`/`LoginDisplay` ile aynı anda DB'ye gitme riski var;
+  bundan sonra böyle bir ihtiyaç çıkarsa ya anonim bir sayfaya
+  (Login gibi) taşınmalı ya da bu riski bilerek göze alınmalı.
+
+- **Kullanıcılar ekranına Sil özelliği eklendi (2026-09-22)**:
+  `/kullanicilar`'da her satıra (kendi hesap hariç) bir "Sil" butonu
+  eklendi, basınca satır altında "Evet, Sil / Vazgeç" onay kartı açılıyor
+  (`UserManager.DeleteAsync`). İki güvenlik kilidi var: kendi hesabını
+  silemezsin (buton hiç görünmüyor), son kalan Yönetici hesabı silinemez
+  (o rolde başka kimse yoksa engellenir). Gerçek DB'ye karşı geçici bir
+  test kullanıcısıyla (oluştur → sil → DB'de iz kalmadığını doğrula)
+  uçtan uca doğrulandı; "son yönetici" guard mantığı gerçek Yönetici
+  kayıtları üzerinde salt okunur olarak (hiçbir hesaba dokunmadan) test
+  edildi.
+
+- **Tekneler Raporu eklendi (2026-09-22)**, `/tekneraporu` (Yönetici +
+  Saha Kontrolörü; Güvenlik erişemez — diğer raporlarla aynı
+  `AuthorizeView` grubu). İhtiyaç: `/tekneler` ekranı 2026-08-25'te
+  6.663 satır yüzünden arama-öncelikli yapılmıştı (bkz. altta), bu da
+  "tüm tekneleri listele + Aktif/Pasif filtrele" ihtiyacını karşılamaz
+  hale getirmişti — Kişiler'de aynı sorun Kişiler Raporu ile çözülmüştü,
+  burada da aynı desen uygulandı (`/tekneler` ekranına dokunulmadı).
+  `KisilerRaporu.razor` ile birebir aynı yapıda: sütunlar Tekne Kodu
+  (içerir/eşittir/başlar ile), Tekne Adı (aynı), Aktif (Tümü/Aktif/
+  Pasif dropdown, `SecimToBool` deseni), ClosedXML Excel export. Sayfa
+  açılışında otomatik filtre yok, "Filtrele"ye basılana kadar placeholder
+  gösteriliyor. Gerçek DB'ye karşı (6.683 satır) doğrulandı: Aktif/Pasif
+  sayıları toplamla eşleşiyor (61 Aktif, 6.622 Pasif), İçerir/Eşittir/
+  Başlar ile operatörleri ve Tekne Adı + Aktif kombinasyon filtresi
+  doğru sonuç üretti.
+
 - **Çekek Takip'te Kimlik No alanına kamerayla barkod okuma eklendi
   (2026-09-22)**: `/cekektakip` Kimlik Numarası (Kişi) alanının yanına
   kamera ikonlu bir buton eklendi — basılınca tam ekran bir modal açılıp
@@ -362,8 +447,12 @@ sıradaki adım olarak güncellenmeli.
   metin arama), Ad Soyad, Firma Adı, Telefon, **Araç Türü** (`Araclar`'a
   `Include` ile join, snapshot alanı değil), **Tekne** (`Tekneler`'e
   join), Ziyaret Sebebi, Giriş Tarihi/Saati, Çıkış Tarihi/Saati, **Durum**
-  (metin karşılığı: Giriş Yapıldı/Süresi Geçti/Çıkış Yapıldı), Açıklama.
-  **Kaydeden dahil değil** (kullanıcı istemiyor). Metin sütunları →
+  (metin karşılığı: Giriş Yapıldı/Süresi Geçti/Çıkış Yapıldı), Açıklama,
+  en sağda **Kaydeden** (2026-09-22'de eklendi — ilk halinde kullanıcı
+  istemediği için hariç tutulmuştu, sonradan fikri değişip filtrelerle
+  birlikte istendi; metin filtresi diğer metin sütunlarıyla aynı içerir/
+  eşittir/başlar ile deseninde, gerçek DB'ye karşı 224.440 kayıt üzerinde
+  doğrulandı). Metin sütunları →
   içerir/eşittir/başlar ile; tarih sütunları → öncesi/sonrası/eşittir/
   arası; Ziyaret Sebebi/Araç Türü/Tekne/Durum → dropdown. Sayfa
   açıldığında Giriş Tarihi = bugün ile otomatik filtreli gelir
@@ -818,12 +907,20 @@ bir iş kalmadı.
 
 ## Kullanıcı Yönetimi (uygulandı, 2026-08-05)
 
-- 3 sabit rol (`Data/Roller.cs`): **Yönetici** (her şey: tanım ekranları +
+- 4 sabit rol (`Data/Roller.cs`): **Yönetici** (her şey: tanım ekranları +
   Çekek Takip + Kullanıcılar), **Saha Kontrolörü** (tanım ekranları +
   Çekek Takip, Kullanıcılar hariç), **Güvenlik** (Kişiler, Araçlar ve
   Çekek Takip — Tekneler, Kişi/Araç Belgeleri, Kullanıcılar hariç;
   2026-08-07'de Kişiler/Araçlar erişimi eklendi, sahada bu iki ekranı
-  kullanacaklar).
+  kullanacaklar), **Ön Büro** (2026-09-22'de eklendi — yalnızca Board
+  `/` ve Takip Raporu `/rapor`; Board'da **salt izleme**: `Board.razor`
+  `sadeceIzleme` bayrağı `AuthenticationStateProvider` üzerinden
+  `IsInRole(Roller.OnBuro)` ile hesaplanıyor, true ise "+15 dk"/"Çıkış"
+  butonları hiç render edilmiyor **ve** `CikisYap`/`SureUzat`
+  metotlarının başında da aynı kontrol tekrarlanıyor — buton görünmese
+  bile metot doğrudan çağrılırsa no-op kalsın diye, savunma amaçlı ikinci
+  bir katman). Diğer tüm ekranlara (Kişiler, Araçlar, Tekneler, belge
+  ekranları, Kişiler/Tekneler Raporu, Kullanıcılar) erişimi yok.
 - Roller ve `kemalyilmaz@viadmc.com` → Yönetici ataması, uygulama her
   başladığında `Program.cs`'de idempotent olarak garanti edilir (yoksa
   oluşturulur, varsa dokunulmaz).
