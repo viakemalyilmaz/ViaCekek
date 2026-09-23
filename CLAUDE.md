@@ -180,6 +180,60 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Kişiler Raporu: aynı 1000 satır sınırı + Ön Büro erişimi
+  (2026-09-23)**: Takip Raporu'ndaki donma çözümüyle birebir aynı desen
+  buraya da uygulandı — filtre mantığı `SorguOlustur(db)`'ye çıkarıldı,
+  `Filtrele()` `CountAsync()` ile `toplamSonucSayisi`'nı alıp ekrana
+  `Take(1000)` kadarını basıyor, `ExcelAktar()` kendi `DbContext`'ini
+  açıp `SorguOlustur()`'u limitsiz tekrar çalıştırıyor. Ayrıca **Ön Büro**
+  rolüne bu rapora erişim açıldı (`@attribute [Authorize]` ve
+  `MainLayout.razor`'daki nav linki, Takip Raporu ile aynı yetki
+  grubuna taşındı — Tekneler/Kişi Belgeleri/Araç Belgeleri/Tekneler
+  Raporu grubundan ayrıldı). Gerçek DB'ye karşı doğrulandı: 21.980
+  kişiden `Take(1000)` tam 1000 döndü, limitsiz Excel sorgusu tamamını
+  getirdi, sıralama tutarlı.
+
+- **Takip Raporu: geniş filtrede donma sorunu çözüldü, ekrana 1000 satır
+  sınırı geldi (2026-09-23)**: Kullanıcı raporun çok sayıda kayıt
+  dönünce dondugunu bildirdi — kök sebep `Filtrele()`'de hiç `Take()`
+  sınırı olmaması, filtreler geniş tutulunca (örn. "Temizle" sonrası
+  tarih filtresi boşsa) 224 binin üzerindeki tüm satırların tek seferde
+  HTML tablosuna basılmaya çalışılmasıydı — Blazor Server'da bu kadar
+  satırın render/diff edilmesi hem sunucuyu hem tarayıcıyı kilitliyordu.
+  **Çözüm**: filtre oluşturma mantığı `SorguOlustur(db)` adında ortak bir
+  metoda çıkarıldı; `Filtrele()` artık önce `CountAsync()` ile
+  `toplamSonucSayisi`'nı alıp ekrana yalnızca `Take(1000)` (`SonucSiniri`
+  sabiti) kadarını basıyor, sınıra takılırsa "@toplam kayıt bulundu —
+  ekranda ilk 1000 gösteriliyor..." uyarısı çıkıyor. **Excel export
+  bilinçli olarak sınırsız bırakıldı** (kullanıcı onayladı) — `ExcelAktar()`
+  artık kendi `DbContext`'ini açıp `SorguOlustur()`'u limitsiz tekrar
+  çalıştırıyor, çünkü donmaya sebep olan DOM'a basılan tabloydu, Excel
+  export tamamen sunucu tarafında/dosya olarak üretiliyor. Gerçek DB'ye
+  karşı doğrulandı: filtresiz 224.492 kayıttan `Take(1000)` tam 1000
+  sonucu 327ms'de döndü, limitsiz Excel sorgusu tüm 224.492 kaydı
+  ~4 saniyede getirdi, iki sorgunun sıralaması (ilk 5 kayıt) tutarlı
+  çıktı.
+
+- **Takip Raporu: Yönetici olmayan roller en fazla son 1 yılı görebiliyor
+  (2026-09-23)**: `CekekTakipRaporu.razor` > `Filtrele()`'de, `yoneticiMi`
+  (`AuthenticationStateProvider` ile `IsInRole(Roller.Yonetici)`)
+  false ise `GirisTarihi >= bugün-1yıl` koşulu, kullanıcının seçtiği
+  diğer tüm filtrelerden bağımsız olarak (AND ile) her zaman ekleniyor
+  — Saha Kontrolörü ve Ön Büro rollerini kapsıyor, Yönetici sınırsız
+  görüyor. Sayfada bu roller için bilgilendirici bir not
+  ("Yalnızca son 1 yıl içindeki kayıtlar görüntülenebilir.") gösteriliyor.
+  Gerçek DB'ye karşı doğrulandı: 224.488 toplam kayıttan 72.134'ü son 1
+  yıl içinde, 152.354'ü daha eski (en eski kayıt 2023-08-26) — sınır
+  doğru hesaplanıyor, `GirisTarihi` hiçbir kayıtta null değil.
+
+- **Ziyaret Sebebi her yeni girişte "Çalışma"ya sıfırlanıyor
+  (2026-09-23)**: `SorguyaDon()` önceden `ziyaretSebebi` alanını hiç
+  sıfırlamıyordu, bu yüzden art arda giriş yapılırken son seçilen
+  Ziyaret Sebebi (kasıtsız bir yan etki olarak) kalıcı oluyordu.
+  Kullanıcı isteğiyle `SorguyaDon()`'a `ziyaretSebebi = ZiyaretSebebi.
+  Calisma;` eklendi — artık her başarılı giriş kaydından sonra sorgu
+  ekranına dönüldüğünde radio seçimi varsayılan "Çalışma"ya döner.
+
 - **Takip Raporu: Tekne filtresi aranabilir yapıldı, Giriş/Çıkış Tarihi
   yan yana getirildi (2026-09-22)**: Tekne filtresi, tüm tekneleri (6.683
   satır) tek `<select>`e döken eski hâlinden `/cekektakip`'teki Tekne
@@ -1004,15 +1058,16 @@ bir iş kalmadı.
   Çekek Takip, Kullanıcılar hariç), **Güvenlik** (Kişiler, Araçlar ve
   Çekek Takip — Tekneler, Kişi/Araç Belgeleri, Kullanıcılar hariç;
   2026-08-07'de Kişiler/Araçlar erişimi eklendi, sahada bu iki ekranı
-  kullanacaklar), **Ön Büro** (2026-09-22'de eklendi — yalnızca Board
-  `/` ve Takip Raporu `/rapor`; Board'da **salt izleme**: `Board.razor`
+  kullanacaklar), **Ön Büro** (2026-09-22'de eklendi — Board `/`,
+  Takip Raporu `/rapor` ve (2026-09-23'te eklendi) Kişiler Raporu
+  `/kisilerraporu`; Board'da **salt izleme**: `Board.razor`
   `sadeceIzleme` bayrağı `AuthenticationStateProvider` üzerinden
   `IsInRole(Roller.OnBuro)` ile hesaplanıyor, true ise "+15 dk"/"Çıkış"
   butonları hiç render edilmiyor **ve** `CikisYap`/`SureUzat`
   metotlarının başında da aynı kontrol tekrarlanıyor — buton görünmese
   bile metot doğrudan çağrılırsa no-op kalsın diye, savunma amaçlı ikinci
   bir katman). Diğer tüm ekranlara (Kişiler, Araçlar, Tekneler, belge
-  ekranları, Kişiler/Tekneler Raporu, Kullanıcılar) erişimi yok.
+  ekranları, Tekneler Raporu, Kullanıcılar) erişimi yok.
 - Roller ve `kemalyilmaz@viadmc.com` → Yönetici ataması, uygulama her
   başladığında `Program.cs`'de idempotent olarak garanti edilir (yoksa
   oluşturulur, varsa dokunulmaz).

@@ -9,10 +9,16 @@
 @using CekekTakipKaydi = ViaCekek.Web.Models.CekekTakip
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Takip Raporu</PageTitle>
 
 <h3>Takip Raporu</h3>
+
+@if (!yoneticiMi)
+{
+    <div class="alert alert-info">Yalnızca son 1 yıl içindeki kayıtlar görüntülenebilir.</div>
+}
 
 <div class="card card-body mb-3">
     <div class="row g-3">
@@ -199,7 +205,14 @@ else if (sonuclar.Count == 0)
 }
 else
 {
-    <p>@sonuclar.Count kayıt bulundu.</p>
+    @if (toplamSonucSayisi > SonucSiniri)
+    {
+        <p>@toplamSonucSayisi kayıt bulundu — ekranda ilk @SonucSiniri gösteriliyor. Tamamı için filtreleri daraltın veya doğrudan Excel'e Aktar'ı kullanın (Excel export sınırsızdır).</p>
+    }
+    else
+    {
+        <p>@toplamSonucSayisi kayıt bulundu.</p>
+    }
     <div class="table-responsive">
         <table class="table table-striped table-hover">
             <thead>
@@ -286,9 +299,14 @@ else
 
     private List<Tekne> tekneler = [];
     private List<CekekTakipKaydi>? sonuclar;
+    private int toplamSonucSayisi;
+    private bool yoneticiMi;
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        yoneticiMi = authState.User.IsInRole(Roller.Yonetici);
+
         await using var db = await DbFactory.CreateDbContextAsync();
         tekneler = await db.Tekneler.AsNoTracking().OrderBy(t => t.TekneKodu).ToListAsync();
         await Filtrele();
@@ -330,14 +348,29 @@ else
     private static string CikisMetni(CekekTakipKaydi kayit) =>
         kayit.CikisTarihi is { } t && kayit.CikisSaati is { } s ? $"{t:dd.MM.yyyy} {s:HH:mm}" : "";
 
-    private async Task Filtrele()
+    // Ekrandaki tablo için üst sınır — sınırsız sonuç Blazor Server'da
+    // (binlerce satırlık render/diff) donmaya yol açıyordu. Excel export
+    // bu sınırı kullanmaz, her zaman filtrelenmiş TÜM sonuçları içerir
+    // (bkz. ExcelAktar) çünkü o tamamen sunucu tarafında, DOM'a hiç
+    // dokunmadan çalışıyor — donmaya sebep olan ekrana basılan tablo.
+    private const int SonucSiniri = 1000;
+
+    private IQueryable<CekekTakipKaydi> SorguOlustur(ApplicationDbContext db)
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
         var sorgu = db.CekekTakipleri
             .AsNoTracking()
             .Include(c => c.Arac)
             .Include(c => c.Tekne)
             .AsQueryable();
+
+        // Yönetici olmayan roller (Saha Kontrolörü, Ön Büro) en fazla son 1
+        // yılın kayıtlarını görebilir — kullanıcının seçtiği diğer
+        // filtrelerden bağımsız olarak her zaman uygulanır.
+        if (!yoneticiMi)
+        {
+            var birYilOnce = DateOnly.FromDateTime(DateTime.Now.AddYears(-1));
+            sorgu = sorgu.Where(c => c.GirisTarihi >= birYilOnce);
+        }
 
         if (!string.IsNullOrWhiteSpace(kimlikTakipFiltre.Deger))
         {
@@ -455,9 +488,20 @@ else
             };
         }
 
+        return sorgu;
+    }
+
+    private async Task Filtrele()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var sorgu = SorguOlustur(db);
+
+        toplamSonucSayisi = await sorgu.CountAsync();
+
         sonuclar = await sorgu
             .OrderByDescending(c => c.GirisTarihi)
             .ThenByDescending(c => c.GirisSaati)
+            .Take(SonucSiniri)
             .ToListAsync();
     }
 
@@ -478,6 +522,7 @@ else
         ziyaretSebebiFiltre = null;
         durumFiltre = null;
         sonuclar = null;
+        toplamSonucSayisi = 0;
     }
 
     // /cekektakip'teki Tekne arama alanıyla aynı desen: tekneler zaten
@@ -521,6 +566,14 @@ else
             return;
         }
 
+        // Ekrandaki tablo SonucSiniri ile sınırlı ama Excel export filtrelenmiş
+        // TÜM sonuçları içerir — bu yüzden sorgu burada limitsiz tekrar çalıştırılıyor.
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var disaAktarilacaklar = await SorguOlustur(db)
+            .OrderByDescending(c => c.GirisTarihi)
+            .ThenByDescending(c => c.GirisSaati)
+            .ToListAsync();
+
         using var workbook = new XLWorkbook();
         var sayfa = workbook.Worksheets.Add("Rapor");
 
@@ -536,7 +589,7 @@ else
         }
 
         var satir = 2;
-        foreach (var kayit in sonuclar)
+        foreach (var kayit in disaAktarilacaklar)
         {
             sayfa.Cell(satir, 1).Value = kayit.KimlikNumarasi ?? kayit.TakipNumarasi ?? string.Empty;
             sayfa.Cell(satir, 2).Value = kayit.AdSoyad ?? string.Empty;

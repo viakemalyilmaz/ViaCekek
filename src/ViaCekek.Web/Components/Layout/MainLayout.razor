@@ -24,13 +24,13 @@
                     <a class="nav-link" href="tekneler">Tekneler</a>
                     <a class="nav-link" href="kisibelgeleri">Kişi Belgeleri</a>
                     <a class="nav-link" href="aracbelgeleri">Araç Belgeleri</a>
-                    <a class="nav-link" href="kisilerraporu">Kişiler Raporu</a>
                     <a class="nav-link" href="tekneraporu">Tekneler Raporu</a>
                 </Authorized>
             </AuthorizeView>
             <AuthorizeView Roles="@($"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.OnBuro}")">
                 <Authorized>
                     <a class="nav-link" href="rapor">Takip Raporu</a>
+                    <a class="nav-link" href="kisilerraporu">Kişiler Raporu</a>
                 </Authorized>
             </AuthorizeView>
             <AuthorizeView Roles="@Roller.Yonetici">

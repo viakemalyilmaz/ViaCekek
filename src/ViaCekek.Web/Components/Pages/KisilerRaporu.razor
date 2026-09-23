@@ -1,5 +1,5 @@
 @page "/kisilerraporu"
-@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru}")]
+@attribute [Authorize(Roles = $"{Roller.Yonetici},{Roller.SahaKontroloru},{Roller.OnBuro}")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
@@ -145,7 +145,14 @@ else if (sonuclar.Count == 0)
 }
 else
 {
-    <p>@sonuclar.Count kayıt bulundu.</p>
+    @if (toplamSonucSayisi > SonucSiniri)
+    {
+        <p>@toplamSonucSayisi kayıt bulundu — ekranda ilk @SonucSiniri gösteriliyor. Tamamı için filtreleri daraltın veya doğrudan Excel'e Aktar'ı kullanın (Excel export sınırsızdır).</p>
+    }
+    else
+    {
+        <p>@toplamSonucSayisi kayıt bulundu.</p>
+    }
     <div class="table-responsive">
         <table class="table table-striped table-hover">
             <thead>
@@ -219,6 +226,13 @@ else
     };
 
     private List<Kisi>? sonuclar;
+    private int toplamSonucSayisi;
+
+    // Takip Raporu'ndaki aynı sorunun aynı çözümü: sınırsız sonuç Blazor
+    // Server'da (binlerce satırlık render/diff) donmaya yol açıyordu.
+    // Excel export bu sınırı kullanmaz (bkz. ExcelAktar) — o tamamen
+    // sunucu tarafında, DOM'a hiç dokunmadan çalışıyor.
+    private const int SonucSiniri = 1000;
 
     private static string KvkkOnayDurumuAdi(KvkkOnayDurumu durum) => durum switch
     {
@@ -231,9 +245,8 @@ else
     private static string KvkkOnayTarihiMetni(Kisi kisi) =>
         kisi.KvkkOnayTarihi is { } t ? $"{t:dd.MM.yyyy}" : "";
 
-    private async Task Filtrele()
+    private IQueryable<Kisi> SorguOlustur(ApplicationDbContext db)
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
         var sorgu = db.Kisiler.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(kimlikFiltre.Deger))
@@ -325,8 +338,19 @@ else
             };
         }
 
+        return sorgu;
+    }
+
+    private async Task Filtrele()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var sorgu = SorguOlustur(db);
+
+        toplamSonucSayisi = await sorgu.CountAsync();
+
         sonuclar = await sorgu
             .OrderBy(k => k.AdSoyad)
+            .Take(SonucSiniri)
             .ToListAsync();
     }
 
@@ -343,6 +367,7 @@ else
         kaptanSecim = string.Empty;
         tekneSahibiSecim = string.Empty;
         sonuclar = null;
+        toplamSonucSayisi = 0;
     }
 
     private async Task ExcelAktar()
@@ -351,6 +376,13 @@ else
         {
             return;
         }
+
+        // Ekrandaki tablo SonucSiniri ile sınırlı ama Excel export filtrelenmiş
+        // TÜM sonuçları içerir — sorgu burada limitsiz tekrar çalıştırılıyor.
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var disaAktarilacaklar = await SorguOlustur(db)
+            .OrderBy(k => k.AdSoyad)
+            .ToListAsync();
 
         using var workbook = new XLWorkbook();
         var sayfa = workbook.Worksheets.Add("Rapor");
@@ -367,7 +399,7 @@ else
         }
 
         var satir = 2;
-        foreach (var kisi in sonuclar)
+        foreach (var kisi in disaAktarilacaklar)
         {
             sayfa.Cell(satir, 1).Value = kisi.KimlikNumarasi;
             sayfa.Cell(satir, 2).Value = kisi.AdSoyad;
