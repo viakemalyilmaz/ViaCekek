@@ -180,6 +180,23 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Kullanım kılavuzu güncellendi + Yardım linki cache-busting
+  (2026-09-25)**: `docs/ViaCekek_Kullanim_Kilavuzu.docx` 2026-08-10'dan
+  sonraki tüm özellikleri kapsayacak şekilde güncellendi (Kullanıcı Adı
+  ile giriş/şifre değiştirme, Ön Büro rolü, arama-öncelikli listeler,
+  kamera barkod, Tekne/Telefon zorunluluğu, süre kuralları, kullanıcı
+  silme, yeni "12. Raporlar" bölümü). Mevcut resimleri korumak için
+  docx yeniden üretilmedi, yalnızca `word/document.xml`'deki paragraflar
+  yerinde düzenlendi. PDF'i kullanıcı Word'den kendisi üretiyor. Yayına
+  alınan yeni PDF, tarayıcı önbelleği yüzünden eski haliyle görünmeye
+  devam etti (IIS `Cache-Control` göndermiyor, tarayıcı heuristic cache
+  uyguluyor); `MainLayout.razor`'daki Yardım linki `app.css`/`app.js`
+  ile aynı desende `?v=<LastWriteTimeUtc.Ticks>` ile versiyonlandı
+  (`KilavuzVersiyonu()`). Geliştirme ortamında PDF `wwwroot`'ta fiziksel
+  olarak olmadığı için (csproj `Link` ile yalnızca build/publish
+  çıktısına kopyalanıyor) `v=0` üretir — zararsız, yayında gerçek
+  değer oluşur.
+
 - **Kişiler Raporu: aynı 1000 satır sınırı + Ön Büro erişimi
   (2026-09-23)**: Takip Raporu'ndaki donma çözümüyle birebir aynı desen
   buraya da uygulandı — filtre mantığı `SorguOlustur(db)`'ye çıkarıldı,

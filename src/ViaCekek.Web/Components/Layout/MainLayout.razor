@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @using ViaCekek.Web.Data
+@inject IWebHostEnvironment Env
 
 <div class="app-shell">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
@@ -38,7 +39,7 @@
                     <a class="nav-link" href="kullanicilar">Kullanıcılar</a>
                 </Authorized>
             </AuthorizeView>
-            <a class="nav-link" href="docs/ViaCekek_Kullanim_Kilavuzu.pdf" target="_blank">Yardım</a>
+            <a class="nav-link" href="docs/ViaCekek_Kullanim_Kilavuzu.pdf?v=@KilavuzVersiyonu()" target="_blank">Yardım</a>
         </div>
         <LoginDisplay />
     </div>
@@ -56,3 +57,15 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    // Kılavuz PDF'i güncellendiğinde tarayıcının eski sürümü önbellekten
+    // göstermemesi için (app.css/app.js'teki DosyaVersiyonu deseni, bkz. App.razor).
+    private string KilavuzVersiyonu()
+    {
+        var yol = Path.Combine(Env.WebRootPath, "docs", "ViaCekek_Kullanim_Kilavuzu.pdf");
+        return File.Exists(yol)
+            ? File.GetLastWriteTimeUtc(yol).Ticks.ToString()
+            : "0";
+    }
+}
