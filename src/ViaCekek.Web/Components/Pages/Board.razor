@@ -23,8 +23,14 @@ else if (kayitlar.Count == 0)
 }
 else
 {
-    <div class="mb-3">
-        <input type="search" class="form-control form-control-lg" style="max-width: 400px;" placeholder="Ara (ad soyad, kimlik/takip no, firma)..." @bind="aramaMetni" @bind:event="oninput" />
+    @* Dar ekranda sayaçlar arama kutusunun altına kayar (flex-wrap) *@
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <input type="search" class="form-control form-control-lg" style="flex: 1 1 280px; max-width: 400px;" placeholder="Ara (ad soyad, kimlik/takip no, firma)..." @bind="aramaMetni" @bind:event="oninput" />
+        @* Sayılar aramadan bağımsız, sahadaki (çıkışı yapılmamış) tüm kayıtlar üzerinden *@
+        <div class="d-flex gap-2">
+            <span class="badge fs-5 board-avatar-kisi">Kişi: @kayitlar.Count(k => k.KisiId is not null)</span>
+            <span class="badge fs-5 board-avatar-arac">Araç: @kayitlar.Count(k => k.AracId is not null)</span>
+        </div>
     </div>
 
     @if (!GorunenKayitlar.Any())

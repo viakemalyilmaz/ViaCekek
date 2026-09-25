@@ -180,6 +180,17 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Board'a Kişi/Araç sayaçları + logo linki tam yenileme
+  (2026-09-25)**: Board'da arama kutusunun sağına "Kişi: N" (mavi) ve
+  "Araç: N" (turuncu, kart ikonlarıyla aynı renkler) rozetleri eklendi —
+  aramadan bağımsız, çıkışı yapılmamış tüm kayıtları sayar; satır
+  `flex-wrap` olduğu için dar ekranda rozetler alt satıra kayar.
+  Ayrıca sol üstteki ViaÇekek logosuna basınca Board tazelenmiyordu:
+  Blazor enhanced navigation aynı URL'de (zaten `/` açıkken) sayfa
+  bileşenini yeniden oluşturmuyor, `OnInitializedAsync` →
+  `ListeyiYenile()` çalışmıyordu. Logo linkine `data-enhance-nav="false"`
+  eklenerek her tıklamada tam sayfa yüklemesi yapılması sağlandı.
+
 - **Kullanım kılavuzu güncellendi + Yardım linki cache-busting
   (2026-09-25)**: `docs/ViaCekek_Kullanim_Kilavuzu.docx` 2026-08-10'dan
   sonraki tüm özellikleri kapsayacak şekilde güncellendi (Kullanıcı Adı
