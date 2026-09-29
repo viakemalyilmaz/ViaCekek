@@ -69,6 +69,12 @@ else
                         <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
                             <span class="badge fs-6 @(kirmizi ? "bg-danger" : "bg-success")">@DurumMetni(kayit)</span>
                             <span class="badge fs-6 bg-secondary">@GirisMetni(kayit)</span>
+                            @* "dk kaldı/geçti" bu saate göre sayılıyor — Keşif/Kontrol'den
+                               Çalışma'ya çevrilen kayıtlarda sayımın nereden başladığı görünsün *@
+                            @if (kayit.BeklenenBitisZamani is { } bitis)
+                            {
+                                <span class="badge fs-6 bg-secondary">Bitiş: @bitis.ToString("HH:mm")</span>
+                            }
                             <span class="badge fs-6 @SureRozetSinifi(kayit)">@SureMetni(kayit)</span>
                         </div>
                     </div>
@@ -229,19 +235,10 @@ else
             return "Süresiz";
         }
 
-        var simdi = DateTime.Now;
-        var kalan = kayit.BeklenenBitisZamani.Value - simdi;
-        if (kalan.TotalMinutes > 0)
-        {
-            return $"{(int)kalan.TotalMinutes} dk kaldı";
-        }
-
-        // Süre dolduysa bitişten değil girişten itibaren geçen süre
-        // gösterilir (izin verilen süre de dahil) — Keşif/Kontrol'den
-        // Çalışma'ya çevrilen kayıtlarda bitiş anı ekranda görünmediği için
-        // bitişe göre sayım kafa karıştırıyordu.
-        var girisZamani = GirisZamani(kayit) ?? kayit.BeklenenBitisZamani.Value;
-        return $"{(int)(simdi - girisZamani).TotalMinutes} dk geçti";
+        var kalan = kayit.BeklenenBitisZamani.Value - DateTime.Now;
+        return kalan.TotalMinutes > 0
+            ? $"{(int)kalan.TotalMinutes} dk kaldı"
+            : $"{(int)Math.Abs(kalan.TotalMinutes)} dk geçti";
     }
 
     // Rozet rengi: süresiz = gri, süresi geçmiş = kırmızı, 10 dk veya
