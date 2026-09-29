@@ -229,10 +229,19 @@ else
             return "Süresiz";
         }
 
-        var kalan = kayit.BeklenenBitisZamani.Value - DateTime.Now;
-        return kalan.TotalMinutes > 0
-            ? $"{(int)kalan.TotalMinutes} dk kaldı"
-            : $"{(int)Math.Abs(kalan.TotalMinutes)} dk geçti";
+        var simdi = DateTime.Now;
+        var kalan = kayit.BeklenenBitisZamani.Value - simdi;
+        if (kalan.TotalMinutes > 0)
+        {
+            return $"{(int)kalan.TotalMinutes} dk kaldı";
+        }
+
+        // Süre dolduysa bitişten değil girişten itibaren geçen süre
+        // gösterilir (izin verilen süre de dahil) — Keşif/Kontrol'den
+        // Çalışma'ya çevrilen kayıtlarda bitiş anı ekranda görünmediği için
+        // bitişe göre sayım kafa karıştırıyordu.
+        var girisZamani = GirisZamani(kayit) ?? kayit.BeklenenBitisZamani.Value;
+        return $"{(int)(simdi - girisZamani).TotalMinutes} dk geçti";
     }
 
     // Rozet rengi: süresiz = gri, süresi geçmiş = kırmızı, 10 dk veya

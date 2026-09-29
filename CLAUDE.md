@@ -180,6 +180,15 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Board: "dk geçti" rozeti girişten itibaren sayıyor (2026-09-29)**:
+  Süresi dolmamış kayıtta rozet hâlâ bitişe kalan süreyi ("X dk kaldı")
+  gösteriyor; süresi dolunca artık bitişten değil **giriş anından**
+  itibaren geçen toplam süreyi ("X dk geçti", izin verilen süre dahil)
+  gösteriyor. Sebep: Keşif/Kontrol'den otomatik Çalışma'ya çevrilen
+  kayıtlarda karttaki "Giriş: 11:07 · 109 dk geçti" (bitiş 12:07'den
+  sayım) kullanıcıya tutarsız görünüyordu. Not: Board hâlâ periyodik
+  yenilenmiyor, rakamlar sayfanın son çizildiği anda sabit kalır.
+
 - **Board'a Kişi/Araç sayaçları + logo linki tam yenileme
   (2026-09-25)**: Board'da arama kutusunun sağına "Kişi: N" (mavi) ve
   "Araç: N" (turuncu, kart ikonlarıyla aynı renkler) rozetleri eklendi —
