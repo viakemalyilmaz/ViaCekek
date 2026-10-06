@@ -25,7 +25,7 @@ else
 {
     @* Dar ekranda sayaçlar arama kutusunun altına kayar (flex-wrap) *@
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-        <input type="search" class="form-control form-control-lg" style="flex: 1 1 280px; max-width: 400px;" placeholder="Ara (ad soyad, kimlik/takip no, firma)..." @bind="aramaMetni" @bind:event="oninput" />
+        <input type="search" class="form-control form-control-lg" style="flex: 1 1 280px; max-width: 400px;" placeholder="Ara (ad soyad, kimlik/takip no, firma, tekne)..." @bind="aramaMetni" @bind:event="oninput" />
         @* Sayılar aramadan bağımsız, sahadaki (çıkışı yapılmamış) tüm kayıtlar üzerinden *@
         <div class="d-flex gap-2">
             <span class="badge fs-5 board-avatar-kisi">Kişi: @kayitlar.Count(k => k.KisiId is not null)</span>
@@ -112,7 +112,9 @@ else
                     (k.AdSoyad?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     (k.KimlikNumarasi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     (k.TakipNumarasi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (k.FirmaAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false));
+                    (k.FirmaAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.Tekne?.TekneAdi?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (k.Tekne?.TekneKodu?.Contains(arama, StringComparison.OrdinalIgnoreCase) ?? false));
             }
 
             return sonuc;

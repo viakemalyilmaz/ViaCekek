@@ -22,15 +22,21 @@
 
 @if (asama == Asama.Sorgu)
 {
-    <form @onsubmit="KontrolYap" class="card card-body mb-3">
+    @* <form> değil <div>: barkod okuyucunun okuma sonuna eklediği Enter formu
+       otomatik gönderip Kontrol'ü tetiklemesin — Kontrol yalnızca butona
+       basılınca çalışır. Buton da aynı sebeple Tab sırasından çıkarıldı. *@
+    <div class="card card-body mb-3">
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Kimlik Numarası (Kişi)</label>
                 <div class="input-group">
                     <input class="form-control form-control-lg"
                            @bind:get="kimlikNumarasi" @bind:set="KimlikNumarasiDegisti" @bind:event="oninput"
-                           autocomplete="off" autofocus />
-                    <button type="button" class="btn btn-outline-secondary btn-lg" @onclick="KameraAc" title="Kamerayla Okut">
+                           @ref="kimlikInput" autocomplete="off" autofocus />
+                    @* tabindex="-1": barkod okuyucu okumanın sonuna Tab (+Enter) eklerse
+                       odak bu butona geçip Enter kamerayı açıyordu — Tab sırasından çıkarıldı,
+                       dokunarak/tıklayarak kullanım etkilenmez. *@
+                    <button type="button" class="btn btn-outline-secondary btn-lg" @onclick="KameraAc" title="Kamerayla Okut" tabindex="-1">
                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                             <circle cx="12" cy="13" r="4" />
@@ -81,7 +87,7 @@
         </div>
 
         <div>
-            <button type="submit" class="btn btn-lg btn-primary">Kontrol</button>
+            <button type="button" class="btn btn-lg btn-primary" @onclick="KontrolYap" tabindex="-1">Kontrol</button>
         </div>
 
         @if (kisiEngelMesaji is not null)
@@ -151,7 +157,7 @@
                 <a class="btn btn-outline-primary" href="@($"araclar?duzenle={bulunanAracId}")">Araç Tanımları'na git</a>
             </div>
         }
-    </form>
+    </div>
 }
 else if (asama == Asama.Onay)
 {
@@ -301,6 +307,13 @@ else if (asama == Asama.Onay)
     ];
 
     private Asama asama = Asama.Sorgu;
+
+    // Sorgu ekranı her açıldığında (sayfa ilk yüklenince ve Onay'dan/kayıttan
+    // sonra geri dönülünce) imleç Kimlik No'ya konur. HTML `autofocus` yalnızca
+    // tam sayfa yüklemesinde çalışıyor; enhanced navigation ve sonradan
+    // render edilen input'ta etkisiz, bu yüzden OnAfterRenderAsync'te veriliyor.
+    private ElementReference kimlikInput;
+    private bool kimlikOdaklanacak = true;
     private string kimlikNumarasi = string.Empty;
     private string takipNumarasi = string.Empty;
     private List<Kisi> eslesenKisiler = [];
@@ -354,6 +367,19 @@ else if (asama == Asama.Onay)
     // olarak tetiklenir.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (kimlikOdaklanacak && asama == Asama.Sorgu && !kameraAcik)
+        {
+            kimlikOdaklanacak = false;
+            try
+            {
+                await kimlikInput.FocusAsync();
+            }
+            catch (Exception)
+            {
+                // Element o an DOM'da değilse (yarış durumu) odak verilmez, sorun değil.
+            }
+        }
+
         if (kameraAcik && !kameraTaramaBaslatildi)
         {
             kameraTaramaBaslatildi = true;
@@ -904,6 +930,7 @@ else if (asama == Asama.Onay)
     private void SorguyaDon()
     {
         asama = Asama.Sorgu;
+        kimlikOdaklanacak = true;
         kimlikNumarasi = string.Empty;
         takipNumarasi = string.Empty;
         ziyaretSebebi = ZiyaretSebebi.Calisma;

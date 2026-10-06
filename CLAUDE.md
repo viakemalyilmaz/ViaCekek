@@ -180,6 +180,10 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **Board araması tekneyi de kapsıyor (2026-10-06)**: arama kutusu
+  artık Tekne Adı ve Tekne Kodu'nda da arıyor (bellek içi, yeni DB
+  sorgusu yok).
+
 - **Board: karta "Bitiş: HH:mm" rozeti eklendi (2026-09-29)**:
   Keşif/Kontrol'den otomatik Çalışma'ya çevrilen kayıtlarda karttaki
   "Giriş: 11:07 · 109 dk geçti" (sayım bitiş 12:07'den) kullanıcıya
@@ -454,6 +458,19 @@ sıradaki adım olarak güncellenmeli.
   hata mesajı gösteriliyor, uygulama çökmüyor. İkon: emoji yerine sade
   çizgisel (outline) bir kamera SVG'si kullanıldı, Board'daki ikon
   yaklaşımıyla tutarlı (harici ikon kütüphanesi yok).
+  **Kullanım (2026-09-30)**: tablette kamera, PC'de USB barkod okuyucu
+  kullanılıyor. PC'de okuyucuyla okutunca kamera modal'ı açılıyordu —
+  okuyucunun okumanın sonuna eklediği Tab odağı kamera butonuna taşıyor,
+  ardından gelen Enter onu tetikliyordu. Kamera butonuna `tabindex="-1"`
+  verildi (Tab sırasından çıktı, dokunma/tıklama etkilenmez).
+  Aynı gün (2026-10-01) kullanıcı isteğiyle okuyucunun Enter'ı Kontrol'ü
+  de **otomatik tetiklemiyor**: Sorgu aşamasındaki `<form @onsubmit>`
+  `<div>`'e çevrildi, Kontrol butonu `type="button" @onclick="KontrolYap"
+  tabindex="-1"` — Kontrol artık yalnızca butona basılınca çalışır.
+  Ayrıca sayfa açılınca ve her `SorguyaDon()` sonrası imleç Kimlik No'ya
+  konuyor (`kimlikInput.FocusAsync()`, `OnAfterRenderAsync`'te
+  `kimlikOdaklanacak` bayrağıyla) — HTML `autofocus` enhanced
+  navigation'da ve sonradan render edilen input'ta çalışmıyordu.
 
 - **Kisi/Arac senkronizasyonu kaldırıldı, Telefon zorunlu oldu, Board'da
   telefon gösteriliyor (2026-08-26)**: Kullanıcı sahada şunu fark etti —
