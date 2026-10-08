@@ -73,12 +73,20 @@
         </div>
 
         <div class="col-md-4">
-            <label class="form-label">KVKK Onay Durumu</label>
-            <select class="form-select" @bind="kvkkOnayDurumuFiltre">
+            <label class="form-label">Kaptan</label>
+            <select class="form-select" @bind="kaptanSecim">
                 <option value="">Tümü</option>
-                <option value="@KvkkOnayDurumu.Bilinmiyor">Bilinmiyor</option>
-                <option value="@KvkkOnayDurumu.OnayVerildi">Onay Verildi</option>
-                <option value="@KvkkOnayDurumu.OnayVerilmedi">Onay Verilmedi</option>
+                <option value="true">Evet</option>
+                <option value="false">Hayır</option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Tekne Sahibi</label>
+            <select class="form-select" @bind="tekneSahibiSecim">
+                <option value="">Tümü</option>
+                <option value="true">Evet</option>
+                <option value="false">Hayır</option>
             </select>
         </div>
 
@@ -88,6 +96,16 @@
                 <option value="">Tümü</option>
                 <option value="true">Evet</option>
                 <option value="false">Hayır</option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">KVKK Onay Durumu</label>
+            <select class="form-select" @bind="kvkkOnayDurumuFiltre">
+                <option value="">Tümü</option>
+                <option value="@KvkkOnayDurumu.Bilinmiyor">Bilinmiyor</option>
+                <option value="@KvkkOnayDurumu.OnayVerildi">Onay Verildi</option>
+                <option value="@KvkkOnayDurumu.OnayVerilmedi">Onay Verilmedi</option>
             </select>
         </div>
 
@@ -107,24 +125,6 @@
                     <input type="date" class="form-control" style="max-width: 170px;" @bind="kvkkOnayTarihiFiltre.Tarih2" />
                 }
             </div>
-        </div>
-
-        <div class="col-md-3">
-            <label class="form-label">Kaptan</label>
-            <select class="form-select" @bind="kaptanSecim">
-                <option value="">Tümü</option>
-                <option value="true">Evet</option>
-                <option value="false">Hayır</option>
-            </select>
-        </div>
-
-        <div class="col-md-3">
-            <label class="form-label">Tekne Sahibi</label>
-            <select class="form-select" @bind="tekneSahibiSecim">
-                <option value="">Tümü</option>
-                <option value="true">Evet</option>
-                <option value="false">Hayır</option>
-            </select>
         </div>
     </div>
 

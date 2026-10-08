@@ -180,6 +180,36 @@ Takip Raporu ve Kişiler Raporu tamamlandı (madde 1-6 aşağıda ✅).
 Kullanım kılavuzu (docs/) henüz Kişiler Raporu'nu kapsamıyor —
 sıradaki adım olarak güncellenmeli.
 
+- **PLAN — Çekek Sahası ayrımı (2026-10-06, henüz UYGULANMADI)**:
+  4 çekek sahası var: **Çekek, Poyraz, Lodos, Mendirek**. Giriş/çıkış
+  kayıtları sahaya göre ayrılır, belirleyici kullanıcıdır. Kararlar:
+  - **Şema**: `ApplicationUser.CekekSahasi` ve `CekekTakip.CekekSahasi`
+    (nvarchar, metin olarak saklanır). Değerler `Roller.cs` desenindeki
+    gibi sabit bir sınıfta tutulur (yeni saha = tek satır ekleme).
+    Migration SQL'i önce kullanıcıya gösterilir.
+  - **Mevcut veri**: migration ile `CekekTakipleri`'deki TÜM mevcut
+    kayıtlar (açık + geçmiş) `'Çekek'` olarak doldurulur.
+  - **Kullanıcılar ekranı**: Çekek Sahası dropdown (4 sabit değer),
+    yeni kullanıcı ve düzenlemede **zorunlu**. Mevcut kullanıcılara
+    sahayı kullanıcı kendisi atayacak.
+  - **Giriş kaydı**: `GirisKaydet()`'te kaydı yapan kullanıcının sahası
+    (rolü ne olursa olsun, Yönetici/Saha Kontrolörü dahil) DB'den o an
+    okunup `CekekTakip.CekekSahasi`'ye snapshot olarak yazılır. Sahası
+    boş kullanıcı için ayrıca runtime kontrolü yapılmaz (form zorunlu
+    alan olduğu için boş olmaz — kullanıcı kararı).
+  - **Açık kayıt kontrolü saha bazlı**: "açık (çıkışsız) kaydı var mı"
+    kontrolü yalnızca kaydı yapan kullanıcının kendi sahasındaki
+    kayıtlara bakar — Poyraz'da içeride görünen kişi/araç Lodos'tan
+    giriş yapabilir (her sahada ayrı açık kaydı olabilir).
+  - **Board**: Güvenlik yalnızca kendi sahasının kayıtlarını görür
+    (sayaçlar dahil). Yönetici, Saha Kontrolörü ve Ön Büro hepsini görür
+    ve onlar için arama kutusuyla birlikte çalışan bir **saha filtresi**
+    (Tümü + 4 saha) olur.
+  - **Takip Raporu**: "Çekek Sahası" sütunu + filtresi + Excel kolonu.
+  - **Ortak kalanlar**: Kişiler, Araçlar, Tekneler, belge tanımları
+    sahalar arasında ortak — yalnızca `CekekTakipleri` ayrılır.
+  - Sonrasında kullanım kılavuzu güncellenmeli.
+
 - **Board araması tekneyi de kapsıyor (2026-10-06)**: arama kutusu
   artık Tekne Adı ve Tekne Kodu'nda da arıyor (bellek içi, yeni DB
   sorgusu yok).
